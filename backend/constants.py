@@ -88,6 +88,9 @@ PAYLOAD_BASE_SIZE = 200  # JSON structure overhead
 # ChromaDB configuration
 COLLECTION_NAME = "ai_memory"
 
+# MVP: Hardcoded user ID for showcase
+USER_ID = "mvp_demo_user_2024"
+
 # API configuration
 API_VERSION = "1.0.0"
 API_TITLE = "SabkiSoch API"

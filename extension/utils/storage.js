@@ -1,8 +1,15 @@
 // Storage utilities for managing user data and context persistence
 
+// MVP: Use USER_ID from constants.js (loaded before this file)
+// USER_ID is declared in utils/constants.js which is loaded first in manifest.json
 let cachedUserId = null;
 
 function getOrCreateUserId() {
+    // MVP: Always return constant USER_ID from constants.js
+    // USER_ID is available globally since constants.js is loaded first
+    return Promise.resolve(USER_ID);
+
+    /* Original dynamic logic removed for MVP - uncomment for production
     return new Promise(resolve => {
         // Always check localStorage first (even if cached) to ensure sync with dashboard
         try {
@@ -71,6 +78,7 @@ function getOrCreateUserId() {
             resolve(id);
         }
     });
+    */
 }
 
 function restoreContextFromStorage() {

@@ -11,8 +11,11 @@ if (!window.__SABKI_SOCH_BACKEND_URL__) {
 const BACKEND_URL = window.__SABKI_SOCH_BACKEND_URL__;
 
 // Initialize storage and scripts
-if (!window.__AI_CONTEXT_INJECTED__) {
+// restoreContextFromStorage is defined in utils/storage.js (loaded before this file)
+if (!window.__AI_CONTEXT_INJECTED__ && typeof restoreContextFromStorage === 'function') {
     restoreContextFromStorage();
+} else if (!window.__AI_CONTEXT_INJECTED__) {
+    console.warn('⚠️ restoreContextFromStorage not available yet');
 }
 
 initializeScripts();

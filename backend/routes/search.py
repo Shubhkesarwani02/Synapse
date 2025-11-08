@@ -12,7 +12,8 @@ import json
 from models.models import SearchRequest, SearchResult
 from constants import (
     EMBEDDING_MODEL_NAME,
-    QUERY_ANALYSIS_PROMPT
+    QUERY_ANALYSIS_PROMPT,
+    USER_ID  # MVP: Hardcoded user ID
 )
 
 router = APIRouter()
@@ -52,19 +53,23 @@ async def semantic_search(request: SearchRequest):
         query_embedding = query_embedding_result['embedding']
 
         # 2. Build where clause with user filter
-        where_clause = {"user_id": request.user_id}
+        # MVP: Use constant USER_ID instead of request.user_id
+        where_clause = {"user_id": USER_ID}  # MVP: Always use constant
         
         # Add additional filters if provided
         if request.filters:
             where_clause.update(request.filters)
 
         # 3. Query ChromaDB with the embedding
+        print(f"🔍 Searching with query: '{request.query}', user_id filter: {where_clause}")
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=request.limit,
             where=where_clause,
             include=["documents", "metadatas", "distances"]
         )
+        
+        print(f"🔍 Search query returned {len(results.get('ids', [[]])[0]) if results.get('ids') else 0} results")
 
         # 4. Format results
         search_results = []
@@ -81,7 +86,10 @@ async def semantic_search(request: SearchRequest):
                     similarity_score=1 - results['distances'][0][i],  # Convert distance to similarity
                     timestamp=metadata.get('time', metadata.get('timestamp', ''))
                 ))
+        else:
+            print(f"⚠️ No search results found for query: '{request.query}'")
 
+        print(f"✅ Returning {len(search_results)} formatted search results")
         return search_results
 
     except Exception as e:
@@ -116,7 +124,8 @@ async def natural_language_search(request: SearchRequest):
         query_embedding = query_embedding_result['embedding']
 
         # 3. Build ChromaDB where clause from extracted filters
-        where_clause = {"user_id": request.user_id}
+        # MVP: Use constant USER_ID instead of request.user_id
+        where_clause = {"user_id": USER_ID}  # MVP: Always use constant
 
         # Add content type filter
         if query_analysis.get('content_type'):

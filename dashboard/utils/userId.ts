@@ -8,33 +8,11 @@ const FALLBACK_KEYS = ['recallhub_user_id', 'synapse_user_id'];
 
 /**
  * Get or create a user ID from localStorage
- * Checks extension's key first, then fallback keys
- * Creates a new UUID if none exists
+ * MVP: Returns hardcoded constant user ID
  */
 export function getOrCreateUserId(): string {
-  // First check for the extension's user ID key
-  let uid = localStorage.getItem(USER_ID_KEY);
-  
-  // Fallback to other keys for backward compatibility
-  if (!uid) {
-    for (const key of FALLBACK_KEYS) {
-      uid = localStorage.getItem(key);
-      if (uid) break;
-    }
-  }
-  
-  // If no user ID exists, create one and store it
-  if (!uid) {
-    uid = crypto.randomUUID();
-    localStorage.setItem(USER_ID_KEY, uid);
-  } else {
-    // Sync to the extension's key if using a fallback key
-    if (!localStorage.getItem(USER_ID_KEY)) {
-      localStorage.setItem(USER_ID_KEY, uid);
-    }
-  }
-  
-  return uid;
+  // MVP: Always return hardcoded user ID
+  return "mvp_demo_user_2024";
 }
 
 /**

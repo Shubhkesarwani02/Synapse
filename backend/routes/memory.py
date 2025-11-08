@@ -13,7 +13,8 @@ import re
 from models.models import MemoryCreate
 from constants import (
     EMBEDDING_MODEL_NAME,
-    METADATA_ENRICHMENT_PROMPT
+    METADATA_ENRICHMENT_PROMPT,
+    USER_ID
 )
 
 router = APIRouter()
@@ -89,9 +90,9 @@ async def save_memory(memory: MemoryCreate):
         # ChromaDB only accepts primitive types (str, int, float, bool, None)
         # So we need to serialize complex types (lists, dicts) as JSON strings
 
-        print(f"User ID: {memory.user_id}")
+        # MVP: Use constant USER_ID instead of memory.user_id
         final_metadata = {
-            "user_id": memory.user_id,
+            "user_id": USER_ID,  # MVP: Hardcoded user ID
             "url": memory.url or "",
             "title": memory.title,
             "timestamp": timestamp,

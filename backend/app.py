@@ -16,7 +16,8 @@ from constants import (
     COLLECTION_NAME,
     API_VERSION,
     API_TITLE,
-    API_DESCRIPTION
+    API_DESCRIPTION,
+    USER_ID  # MVP: Hardcoded user ID
 )
 
 # Import Gemini utilities
@@ -175,7 +176,7 @@ async def save_content(req: StoreRequest):
         
         # Prepare metadata for ChromaDB
         final_metadata = {
-            "user_id": req.user_id,
+            "user_id": USER_ID,  # MVP: Hardcoded user ID
             "source": req.source,
             "url": req.url or "",
             "title": req.title or "Untitled",
@@ -205,12 +206,13 @@ async def save_content(req: StoreRequest):
         raise HTTPException(status_code=500, detail=f"Failed to save content: {str(e)}")
 
 @app.get("/api/stats")
-async def get_stats(user_id: str):
+async def get_stats(user_id: str = None):  # MVP: Parameter ignored, uses constant
     """Get statistics for a user's saved content"""
     try:
+        # MVP: Use constant USER_ID instead of parameter
         # Get all items for user
         results = collection.get(
-            where={"user_id": user_id}
+            where={"user_id": USER_ID}  # MVP: Always use constant
         )
         
         if not results or not results['ids']:
@@ -246,14 +248,15 @@ async def get_stats(user_id: str):
 @app.delete("/api/delete/{memory_id}")
 async def delete_memory(
     memory_id: str,
-    user_id: str = Query(..., description="User ID to verify ownership")
+    user_id: str = Query(None, description="User ID (ignored in MVP)")
 ):
     """Delete a specific memory by ID"""
     try:
+        # MVP: Use constant USER_ID instead of parameter
         # Verify ownership
         result = collection.get(
             ids=[memory_id],
-            where={"user_id": user_id}
+            where={"user_id": USER_ID}  # MVP: Always use constant
         )
         
         if not result or not result['ids']:
@@ -275,8 +278,9 @@ async def delete_memory(
         raise HTTPException(status_code=500, detail=f"Failed to delete memory: {str(e)}")
 
 @app.get("/get_all")
-async def get_all(user_id: str):
-    return await get_all_conversations(user_id, collection)
+async def get_all(user_id: str = None):  # MVP: Parameter ignored, uses constant
+    # MVP: Use constant USER_ID instead of parameter
+    return await get_all_conversations(USER_ID, collection)
 
 
 @app.get("/health")
@@ -301,17 +305,19 @@ async def clear_all_data():
     return await clear_all_data_func(collection)
 
 @app.delete("/clear/{user_id}")
-async def clear_user_data(user_id: str):
-    """Clear all data for a specific user"""
-    return await clear_user_data_func(user_id, collection)
+async def clear_user_data(user_id: str = None):  # MVP: Parameter ignored
+    """Clear all data for a specific user (MVP: clears all data)"""
+    # MVP: Use constant USER_ID - but actually clear all for MVP
+    return await clear_all_data_func(collection)  # MVP: Clear all data
 
 @app.delete("/delete_context/{context_id}")
 async def delete_context(
     context_id: str,
-    user_id: str = Query(..., description="User ID to verify ownership")
+    user_id: str = Query(None, description="User ID (ignored in MVP)")
 ):
-    """Delete a specific context by context_id, verifying it belongs to user_id"""
-    return await delete_context_by_id_func(context_id, user_id, collection)
+    """Delete a specific context by context_id (MVP: uses constant USER_ID)"""
+    # MVP: Use constant USER_ID instead of parameter
+    return await delete_context_by_id_func(context_id, USER_ID, collection)
 
 
 @app.post("/generate_context")
@@ -322,11 +328,12 @@ async def generate_context(request: ContextRequest):
 @app.get("/generate_context/{context_id}")
 async def generate_context_by_id(
     context_id: str, 
-    user_id: str = Query(..., description="User ID"), 
+    user_id: str = Query(None, description="User ID (ignored in MVP)"), 
     max_length: int = Query(2000, description="Maximum context length")
 ):
-    """Generate intelligent context summary for a specific stored conversation"""
-    return await generate_context_from_specific_conversation(context_id, user_id, max_length, collection)
+    """Generate intelligent context summary for a specific stored conversation (MVP: uses constant USER_ID)"""
+    # MVP: Use constant USER_ID instead of parameter
+    return await generate_context_from_specific_conversation(context_id, USER_ID, max_length, collection)
 
 @app.get("/")
 async def root():

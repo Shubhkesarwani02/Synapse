@@ -8,7 +8,8 @@ from typing import Dict, Any
 
 from constants import (
     MAX_CONTEXT_LENGTH,
-    CONTEXT_GENERATION_PROMPT
+    CONTEXT_GENERATION_PROMPT,
+    USER_ID  # MVP: Hardcoded user ID
 )
 from models.models import ContextRequest
 from utils.gemini import generate_context_with_gemini
@@ -36,15 +37,13 @@ async def generate_context_from_all_conversations(
         HTTPException: If validation fails or generation error occurs
     """
     try:
-        if not request.user_id or len(request.user_id.strip()) == 0:
-            raise HTTPException(status_code=400, detail="user_id is required")
-        
-        user_id = request.user_id.strip()
+        # MVP: Use constant USER_ID instead of request.user_id
+        user_id = USER_ID
         max_length = min(request.max_length or 2000, MAX_CONTEXT_LENGTH)
         
         # Get all conversations for the user
         try:
-            results = collection.get(where={"user_id": user_id})
+            results = collection.get(where={"user_id": USER_ID})  # MVP: Always use constant
             documents = results.get("documents", [])
             metadatas = results.get("metadatas", [])
             
@@ -114,13 +113,11 @@ async def generate_context_from_specific_conversation(
         HTTPException: If validation fails or generation error occurs
     """
     try:
-        if not user_id or len(user_id.strip()) == 0:
-            raise HTTPException(status_code=400, detail="user_id is required")
-        
+        # MVP: Use constant USER_ID instead of parameter
         if not context_id or len(context_id.strip()) == 0:
             raise HTTPException(status_code=400, detail="context_id is required")
         
-        user_id = user_id.strip()
+        user_id = USER_ID  # MVP: Always use constant
         context_id = context_id.strip()
         max_length = min(max_length or 2000, MAX_CONTEXT_LENGTH)
         
@@ -128,7 +125,7 @@ async def generate_context_from_specific_conversation(
         try:
             results = collection.get(
                 ids=[context_id],
-                where={"user_id": user_id}
+                where={"user_id": USER_ID}  # MVP: Always use constant
             )
             documents = results.get("documents", [])
             metadatas = results.get("metadatas", [])

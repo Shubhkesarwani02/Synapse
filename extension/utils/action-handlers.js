@@ -59,7 +59,8 @@ async function handleStoreContext(backendUrl) {
         return { success: false, message: 'No content to store' };
     }
 
-    const userId = await getOrCreateUserId();
+    // MVP: Use hardcoded user ID
+    const userId = "mvp_demo_user_2024";
     console.log('📤 store-context using user_id:', userId);
 
     const payload = {

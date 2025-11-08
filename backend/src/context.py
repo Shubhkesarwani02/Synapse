@@ -13,7 +13,8 @@ from constants import (
     MAX_TEXT_LENGTH,
     PAYLOAD_SIZE_LIMIT,
     PAYLOAD_SIZE_BUFFER,
-    estimate_payload_size
+    estimate_payload_size,
+    USER_ID  # MVP: Hardcoded user ID
 )
 from models.models import StoreRequest
 from utils.gemini import generate_title_with_gemini
@@ -68,8 +69,9 @@ async def store_conversation(
         title = generate_title_with_gemini(req.text, req.source)
         
         # Prepare metadata (ChromaDB requires string values for datetime)
+        # MVP: Use constant USER_ID instead of req.user_id
         metadata = {
-            "user_id": req.user_id, 
+            "user_id": USER_ID,  # MVP: Hardcoded user ID
             "source": req.source, 
             "url": req.url,
             "time": time.isoformat(),  # Convert datetime to ISO format string
@@ -100,7 +102,7 @@ async def get_all_conversations(user_id: str, collection) -> Dict[str, Any]:
     Retrieve all conversations for a specific user.
     
     Args:
-        user_id: The user ID to retrieve conversations for
+        user_id: The user ID to retrieve conversations for (ignored in MVP, uses constant)
         collection: ChromaDB collection instance
         
     Returns:
@@ -110,19 +112,13 @@ async def get_all_conversations(user_id: str, collection) -> Dict[str, Any]:
         HTTPException: If validation fails or retrieval error occurs
     """
     try:
-        # Validate user_id
-        if not user_id or not user_id.strip():
-            raise HTTPException(status_code=400, detail="user_id is required")
-        
-        if len(user_id) > MAX_USER_ID_LENGTH:
-            raise HTTPException(status_code=400, detail=f"user_id too long (max {MAX_USER_ID_LENGTH} characters)")
-        
-        user_id = user_id.strip()
+        # MVP: Use constant USER_ID instead of parameter
+        user_id = USER_ID
         
         # Use get() method for metadata-based retrieval
         try:
             results = collection.get(
-                where={"user_id": user_id}
+                where={"user_id": USER_ID}  # MVP: Always use constant
             )
         except Exception as get_error:
             print(f"❌ Error retrieving data for user_id {user_id}: {str(get_error)}")

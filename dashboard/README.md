@@ -38,8 +38,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 - 🔍 **Semantic Search**: Search using natural language
 - 🧠 **Natural Language Search**: Advanced queries with filters
-- 🖤 **Monochrome UI**: Professional black/white theme with a one-click toggle
-- 🗂️ **Clean Cards**: Minimal memory cards focused on content, not chrome
+- 🎨 **Rich Memory Cards**: Different layouts for articles, videos, products, books, etc.
 - 📊 **Similarity Scores**: See how relevant each result is
 - 🎯 **Smart Filters**: Automatically detect content types, dates, prices
 
@@ -56,19 +55,4 @@ The extension automatically syncs its user ID to localStorage, so the dashboard 
 To manually set your user ID in browser console:
 ```javascript
 localStorage.setItem('ai_mem_user_id', 'your_user_id');
-```
-
-## Theme
-
-The dashboard supports a monochrome theme (Black or White):
-
-- Toggle via the button in the header.
-- Preference is saved in `localStorage` under `rh-theme`.
-- Auto-detects system preference on first load.
-
-If you want to force a theme during development, you can set it in DevTools:
-
-```js
-localStorage.setItem('rh-theme', 'dark'); // or 'light'
-location.reload();
 ```
