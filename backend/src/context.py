@@ -125,6 +125,7 @@ async def get_all_conversations(user_id: str, collection) -> Dict[str, Any]:
                 where={"user_id": user_id}
             )
         except Exception as get_error:
+            print(f"❌ Error retrieving data for user_id {user_id}: {str(get_error)}")
             # Return empty results if query fails
             return {"items": [], "count": 0}
         
@@ -134,7 +135,22 @@ async def get_all_conversations(user_id: str, collection) -> Dict[str, Any]:
         metadatas = results.get("metadatas", [])
         ids = results.get("ids", [])
         
+        # Log for debugging
+        print(f"📦 Retrieved {len(ids)} items for user_id: {user_id}")
+        if len(ids) > 0:
+            # Show sample of user_ids from metadata to verify
+            sample_user_ids = [md.get("user_id", "MISSING") for md in metadatas[:5]]
+            print(f"   Sample user_ids in metadata: {sample_user_ids}")
+            # Show content types
+            content_types = [md.get("type") or md.get("content_type", "unknown") for md in metadatas[:10]]
+            print(f"   Content types: {content_types}")
+        
         for doc, md, id_ in zip(documents, metadatas, ids):
+            # Verify user_id matches
+            stored_user_id = md.get("user_id", "")
+            if stored_user_id != user_id:
+                print(f"⚠️ WARNING: Mismatch! Requested user_id: {user_id}, Stored user_id: {stored_user_id}, Item ID: {id_}")
+            
             docs.append({
                 "id": id_, 
                 "text": doc, 

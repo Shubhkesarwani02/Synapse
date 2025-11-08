@@ -36,9 +36,17 @@ async function getAllContexts(userId, backendUrl) {
         }
 
         const data = await response.json();
+        // Format items to match expected context structure
+        const contexts = (data.items || []).map(item => ({
+            id: item.id,
+            text: item.text,
+            metadata: item.metadata || {}
+        }));
+
         return {
             success: true,
-            items: data.items || []
+            items: contexts,
+            contexts: contexts  // Also provide as contexts for compatibility
         };
     } catch (error) {
         console.error('❌ Error getting all contexts:', error);

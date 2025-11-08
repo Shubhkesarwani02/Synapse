@@ -34,18 +34,36 @@ async function loadAndInjectContext(contextData, autoSend = true) {
  */
 async function handleStoreContext(backendUrl) {
     let content = window.__SABKI_SOCH_LAST_API_PAYLOAD__ || scrapeVisibleChat();
-    
+
+    // Ensure content is a string
+    if (typeof content !== 'string') {
+        // If it's an object, skip if it looks like an API response
+        if (typeof content === 'object') {
+            if (content.total !== undefined || content.by_type !== undefined ||
+                content.items !== undefined || content.count !== undefined) {
+                return { success: false, message: 'Cannot store API response data' };
+            }
+            // Otherwise, stringify it
+            content = JSON.stringify(content);
+        } else {
+            content = String(content);
+        }
+    }
+
     // If scrapeVisibleChat returns empty or invalid, fallback to page text
     if (!content || typeof content !== 'string' || content.trim() === '') {
         content = document.body.innerText?.trim() || '';
     }
-    
+
     if (!content || content.trim() === '') {
         return { success: false, message: 'No content to store' };
     }
 
+    const userId = await getOrCreateUserId();
+    console.log('📤 store-context using user_id:', userId);
+
     const payload = {
-        user_id: await getOrCreateUserId(),
+        user_id: userId,
         source: location.hostname,
         text: content,
         url: location.href,

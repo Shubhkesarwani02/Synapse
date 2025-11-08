@@ -27,23 +27,23 @@
     const detectContentType = () => {
         const url = window.location.href;
         const domain = window.location.hostname;
-        
+
         // Product detection (Amazon, eBay, etc.)
-        if (domain.includes('amazon.') || domain.includes('ebay.') || 
+        if (domain.includes('amazon.') || domain.includes('ebay.') ||
             domain.includes('shopify.') || domain.includes('etsy.')) {
             return { type: 'product', extractor: extractProduct };
         }
-        
+
         // Video detection (YouTube, Vimeo)
         if (domain.includes('youtube.com') || domain.includes('vimeo.com')) {
             return { type: 'video', extractor: extractVideo };
         }
-        
+
         // Article detection (Medium, Substack, blogs)
         if (isArticlePage()) {
             return { type: 'article', extractor: extractArticle };
         }
-        
+
         // Default to note
         return { type: 'note', extractor: extractGeneric };
     };
@@ -126,15 +126,15 @@
 
         if (window.location.hostname.includes('youtube.com')) {
             video.title = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent.trim() ||
-                          document.querySelector('meta[property="og:title"]')?.content;
+                document.querySelector('meta[property="og:title"]')?.content;
             video.author = document.querySelector('#owner-name a')?.textContent.trim();
             video.thumbnail_url = document.querySelector('meta[property="og:image"]')?.content;
             video.description = document.querySelector('#description')?.textContent.trim().slice(0, 500);
-            
+
             const durationText = document.querySelector('.ytp-time-duration')?.textContent;
             if (durationText) {
                 const parts = durationText.split(':').map(Number);
-                video.duration = parts.length === 3 
+                video.duration = parts.length === 3
                     ? parts[0] * 3600 + parts[1] * 60 + parts[2]
                     : parts[0] * 60 + parts[1];
             }
@@ -156,7 +156,7 @@
         };
 
         article.title = document.querySelector('h1')?.textContent.trim() ||
-                        document.querySelector('meta[property="og:title"]')?.content;
+            document.querySelector('meta[property="og:title"]')?.content;
 
         const authorSelectors = ['[rel="author"]', '.author-name', '[itemprop="author"]', 'meta[name="author"]'];
         for (const selector of authorSelectors) {
@@ -186,7 +186,7 @@
                     .map(p => p.textContent.trim())
                     .filter(t => t.length > 50)
                     .join('\n\n');
-                
+
                 article.content = text.slice(0, 2000);
                 const wordCount = text.split(/\s+/).length;
                 article.read_time = Math.ceil(wordCount / 200);
@@ -542,7 +542,7 @@
         modalButtons.forEach(btn => {
             const isSmart = btn.dataset.isSmart === 'true';
             const isDanger = btn.id === 'sabkisoch-clear-btn';
-            
+
             btn.addEventListener('mouseenter', () => {
                 btn.style.background = isSmart ? 'rgba(220, 252, 231, 0.95)' : 'rgba(249, 249, 249, 0.95)';
                 btn.style.borderColor = isDanger ? '#fca5a5' : (isSmart ? '#86efac' : '#d0d0d0');
@@ -623,16 +623,74 @@
     const saveContentToBackend = async () => {
         const { type, extractor } = detectContentType();
         const contentData = extractor();
-        
-        // Get user ID - try multiple sources
-        const userId = localStorage.getItem('AI_CONTEXT_USER') || 
-                      document.AI_CONTEXT || 
-                      'demo_user';
-        
+
+        // Get user ID from content script (extension context)
+        // This ensures we use the same user_id as the rest of the extension
+        let userId = null;
+        try {
+            // Request user ID from content script
+            userId = await new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                    resolve(null);
+                }, 1000); // 1 second timeout
+
+                const messageHandler = (event) => {
+                    if (event.data?.type === MESSAGE_TYPES.USER_ID_RESPONSE) {
+                        clearTimeout(timeout);
+                        window.removeEventListener('message', messageHandler);
+                        resolve(event.data.userId);
+                    }
+                };
+
+                window.addEventListener('message', messageHandler);
+                window.postMessage({ type: MESSAGE_TYPES.GET_USER_ID }, '*');
+            });
+        } catch (e) {
+            console.error('Error getting user ID:', e);
+        }
+
+        // Fallback to localStorage if content script doesn't respond
+        // Only use the correct key 'ai_mem_user_id' to match extension behavior
+        if (!userId) {
+            userId = localStorage.getItem('ai_mem_user_id');
+            if (!userId) {
+                console.warn('⚠️ No user_id found! Content script did not respond and localStorage is empty.');
+                console.warn('   This may cause content to be saved with wrong user_id. Please refresh the page.');
+                // Don't use 'demo_user' or old keys - this causes mismatches
+                // Instead, try one more time to get from content script
+                userId = await new Promise((resolve) => {
+                    const timeout = setTimeout(() => {
+                        resolve(null);
+                    }, 500);
+
+                    const messageHandler = (event) => {
+                        if (event.data?.type === MESSAGE_TYPES.USER_ID_RESPONSE) {
+                            clearTimeout(timeout);
+                            window.removeEventListener('message', messageHandler);
+                            resolve(event.data.userId);
+                        }
+                    };
+
+                    window.addEventListener('message', messageHandler);
+                    window.postMessage({ type: MESSAGE_TYPES.GET_USER_ID }, '*');
+                });
+            }
+        }
+
+        console.log('📤 save-note/video using user_id:', userId, 'Type:', type);
+        console.log('   localStorage ai_mem_user_id:', localStorage.getItem('ai_mem_user_id'));
+
+        if (!userId) {
+            console.error('❌ Cannot save: No user_id available!');
+            setButtonError('sabkisoch-smart-save-btn', '❌ No User ID');
+            showNotification('Failed to save: No user ID found. Please refresh the page.', 'error');
+            return;
+        }
+
         try {
             // Extract media URLs from the page
             const media = [];
-            
+
             // Collect images
             document.querySelectorAll('img').forEach(img => {
                 const src = img.src || img.getAttribute('data-src');
@@ -640,7 +698,7 @@
                     media.push({ type: 'image', url: src });
                 }
             });
-            
+
             // Collect videos
             document.querySelectorAll('video').forEach(video => {
                 const src = video.src || video.querySelector('source')?.src;
@@ -648,7 +706,7 @@
                     media.push({ type: 'video', url: src });
                 }
             });
-            
+
             // Collect iframes (embedded videos)
             document.querySelectorAll('iframe').forEach(iframe => {
                 const src = iframe.src;
@@ -656,7 +714,7 @@
                     media.push({ type: 'video', url: src });
                 }
             });
-            
+
             // Build payload for /api/memory endpoint
             const payload = {
                 user_id: userId,
@@ -669,7 +727,7 @@
                     media: media.slice(0, 20) // Limit to first 20 media items
                 }
             };
-            
+
             // Try /api/memory first, fallback to /api/save if it fails
             let response;
             try {
@@ -694,7 +752,7 @@
                     })
                 });
             }
-            
+
             if (response.ok) {
                 const result = await response.json();
                 setButtonSuccess('sabkisoch-smart-save-btn', '✅ Saved!');
@@ -732,9 +790,9 @@
             font-size: 14px;
             font-weight: 500;
         `;
-        
+
         document.body.appendChild(notif);
-        
+
         setTimeout(() => {
             notif.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => notif.remove(), 300);

@@ -44,12 +44,15 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ## User ID
 
-The app looks for a user ID in localStorage under these keys (in order):
-1. `recallhub_user_id`
-2. `synapse_user_id`
-3. Falls back to `demo_user`
+The app automatically syncs with the extension's user ID. It looks for a user ID in localStorage under these keys (in order):
+1. `ai_mem_user_id` (extension's key - primary)
+2. `recallhub_user_id` (fallback for backward compatibility)
+3. `synapse_user_id` (fallback for backward compatibility)
+4. Creates a new UUID if none exists
 
-Set your user ID in browser console:
+The extension automatically syncs its user ID to localStorage, so the dashboard will use the same user ID as the extension.
+
+To manually set your user ID in browser console:
 ```javascript
-localStorage.setItem('recallhub_user_id', 'your_user_id');
+localStorage.setItem('ai_mem_user_id', 'your_user_id');
 ```

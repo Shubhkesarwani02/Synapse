@@ -4,26 +4,70 @@ let cachedUserId = null;
 
 function getOrCreateUserId() {
     return new Promise(resolve => {
-        if (cachedUserId) {
-            return resolve(cachedUserId);
+        // Always check localStorage first (even if cached) to ensure sync with dashboard
+        try {
+            const localStorageId = localStorage.getItem('ai_mem_user_id');
+            if (localStorageId) {
+                // If localStorage has a different ID than cache, update cache
+                if (cachedUserId && cachedUserId !== localStorageId) {
+                    console.log(`🔄 User ID changed! Old: ${cachedUserId}, New: ${localStorageId}`);
+                    cachedUserId = localStorageId;
+                } else if (!cachedUserId) {
+                    cachedUserId = localStorageId;
+                }
+                // Sync to Chrome storage
+                try {
+                    chrome.storage.local.set({ ai_mem_user_id: localStorageId }, () => {
+                        resolve(localStorageId);
+                    });
+                } catch (e) {
+                    resolve(localStorageId);
+                }
+                return;
+            }
+        } catch (localStorageError) {
+            // localStorage not available, continue
         }
 
+        // If we reach here, localStorage doesn't have an ID, check Chrome storage
         try {
             chrome.storage.local.get(['ai_mem_user_id'], (res) => {
                 if (res.ai_mem_user_id) {
                     cachedUserId = res.ai_mem_user_id;
+                    // Sync to localStorage for dashboard access
+                    try {
+                        localStorage.setItem('ai_mem_user_id', cachedUserId);
+                    } catch (e) {
+                        // localStorage might not be available in some contexts
+                    }
                     return resolve(cachedUserId);
                 }
 
+                // No ID found in either storage, create new one
                 const id = crypto.randomUUID();
+                cachedUserId = id;
+
+                // Save to both storages
                 chrome.storage.local.set({ ai_mem_user_id: id }, () => {
-                    cachedUserId = id;
+                    try {
+                        localStorage.setItem('ai_mem_user_id', id);
+                    } catch (e) {
+                        // localStorage might not be available
+                    }
                     resolve(id);
                 });
             });
         } catch (e) {
+            // Fallback: create new ID and save to localStorage
             const id = crypto.randomUUID();
             cachedUserId = id;
+
+            try {
+                localStorage.setItem('ai_mem_user_id', id);
+            } catch (localStorageError) {
+                // localStorage might not be available
+            }
+
             resolve(id);
         }
     });

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import MemoryCard from '@/components/MemoryCard';
 import SearchBar from '@/components/SearchBar';
+import { getOrCreateUserId, syncWithExtension } from '@/utils/userId';
 
 interface SearchResult {
   id: string;
@@ -10,24 +11,128 @@ interface SearchResult {
   url: string;
   title: string;
   metadata: any;
-  similarity_score: number;
+  similarity_score?: number;
   timestamp: string;
+}
+
+interface MemoryItem {
+  id: string;
+  text: string;
+  metadata: any;
+}
+
+interface Stats {
+  total: number;
+  by_type: Record<string, number>;
+  recent_count: number;
 }
 
 export default function Dashboard() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [allMemories, setAllMemories] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMemories, setLoadingMemories] = useState(false);
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [selectedType, setSelectedType] = useState<string>('all');
 
   useEffect(() => {
-    // Get userId from localStorage (can be set by extension or manually)
-    const uid = localStorage.getItem('recallhub_user_id') || 
-                 localStorage.getItem('synapse_user_id') ||
-                 'demo_user';
-    setUserId(uid);
+    // Get or create userId - syncs with extension's storage
+    // Extension checks localStorage first, so they should always match
+    const initializeUserId = async () => {
+      // Try to sync with extension first (helps fix any existing mismatches)
+      // This prioritizes extension's user_id since it has the saved content
+      const synced = await syncWithExtension();
+      
+      // Get or create user ID (will use extension's ID if synced)
+      const uid = getOrCreateUserId();
+      console.log('🆔 Dashboard user_id:', uid);
+      setUserId(uid);
+    };
+    
+    initializeUserId();
   }, []);
+
+  // Fetch all memories and stats
+  const fetchAllMemories = async () => {
+    if (!userId) return;
+    
+    setLoadingMemories(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      
+      // Fetch all memories
+      const memoriesResponse = await fetch(`${apiUrl}/get_all?user_id=${userId}`);
+      if (memoriesResponse.ok) {
+        const memoriesData = await memoriesResponse.json();
+        
+        // Parse and format memories
+        const formattedMemories: SearchResult[] = (memoriesData.items || []).map((item: MemoryItem) => {
+          // Parse metadata if it contains JSON strings
+          let metadata = item.metadata || {};
+          
+          // If metadata has serialized JSON strings (like media, tasks), parse them
+          if (metadata.media && typeof metadata.media === 'string') {
+            try {
+              metadata.media = JSON.parse(metadata.media);
+            } catch (e) {
+              // Keep as string if parsing fails
+            }
+          }
+          if (metadata.tasks && typeof metadata.tasks === 'string') {
+            try {
+              metadata.tasks = JSON.parse(metadata.tasks);
+            } catch (e) {
+              // Keep as string if parsing fails
+            }
+          }
+          
+          return {
+            id: item.id,
+            content: item.text || '',
+            url: metadata.url || '',
+            title: metadata.title || item.text?.substring(0, 100) || 'Untitled',
+            metadata: metadata,
+            timestamp: metadata.timestamp || metadata.time || '',
+          };
+        });
+        
+        // Sort by timestamp (newest first)
+        formattedMemories.sort((a, b) => {
+          const timeA = a.timestamp || '';
+          const timeB = b.timestamp || '';
+          return timeB.localeCompare(timeA);
+        });
+        
+        console.log('📦 Loaded memories:', formattedMemories.length);
+        console.log('📊 Memory types:', formattedMemories.map(m => m.metadata?.type || m.metadata?.content_type || 'unknown'));
+        
+        setAllMemories(formattedMemories);
+      } else {
+        console.error('Failed to fetch memories:', memoriesResponse.status, memoriesResponse.statusText);
+      }
+
+      // Fetch stats
+      const statsResponse = await fetch(`${apiUrl}/api/stats?user_id=${userId}`);
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setStats(statsData);
+      }
+    } catch (err) {
+      console.error('Failed to fetch memories:', err);
+    } finally {
+      setLoadingMemories(false);
+    }
+  };
+
+  // Fetch all memories and stats when userId is available
+  useEffect(() => {
+    if (userId) {
+      fetchAllMemories();
+    }
+  }, [userId]);
 
   const handleSearch = async (useNaturalLanguage: boolean = false) => {
     if (!query.trim() || !userId) return;
@@ -63,25 +168,117 @@ export default function Dashboard() {
     }
   };
 
+  // Filter memories by type
+  const getFilteredMemories = () => {
+    if (selectedType === 'all') {
+      return allMemories;
+    }
+    return allMemories.filter(memory => {
+      // Check both 'type' (new format) and 'content_type' (old format)
+      const type = memory.metadata?.type || memory.metadata?.content_type || 'note';
+      return type === selectedType;
+    });
+  };
+
+  // Get available content types from stats and actual memories
+  const getContentTypes = () => {
+    const typesFromStats = stats?.by_type ? Object.keys(stats.by_type) : [];
+    // Also get types from actual memories (in case stats is outdated)
+    const typesFromMemories = new Set(
+      allMemories.map(m => m.metadata?.type || m.metadata?.content_type || 'note')
+    );
+    // Combine and deduplicate
+    const allTypes = new Set([...typesFromStats, ...Array.from(typesFromMemories)]);
+    return Array.from(allTypes).sort();
+  };
+
+  const displayMemories = query ? results : getFilteredMemories();
+  const isSearchMode = !!query.trim();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-6xl font-bold text-gray-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-600">
             Recallhub
           </h1>
           <p className="text-xl text-gray-600">Your Second Brain - Search Your Memories Naturally</p>
-          <p className="text-sm text-gray-500 mt-2">User: {userId}</p>
+          <div className="flex items-center justify-center gap-4 mt-2">
+            <p className="text-sm text-gray-500">User: {userId}</p>
+            <button
+              onClick={fetchAllMemories}
+              disabled={loadingMemories}
+              className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Refresh memories"
+            >
+              {loadingMemories ? '🔄 Loading...' : '🔄 Refresh'}
+            </button>
+          </div>
         </div>
 
+        {/* Stats */}
+        {stats && stats.total > 0 && (
+          <div className="max-w-4xl mx-auto mb-6 p-4 bg-white rounded-lg shadow-sm">
+            <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{stats.total}</div>
+                <div className="text-gray-600">Total Memories</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{stats.recent_count}</div>
+                <div className="text-gray-600">Recent (7 days)</div>
+              </div>
+              {Object.entries(stats.by_type).map(([type, count]) => (
+                <div key={type} className="text-center">
+                  <div className="text-xl font-semibold text-gray-700">{count}</div>
+                  <div className="text-gray-600 capitalize">{type}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Search Bar */}
-        <SearchBar
-          query={query}
-          setQuery={setQuery}
-          onSearch={handleSearch}
-          loading={loading}
-        />
+        <div className="max-w-3xl mx-auto mb-6">
+          <SearchBar
+            query={query}
+            setQuery={setQuery}
+            onSearch={handleSearch}
+            loading={loading}
+          />
+        </div>
+
+        {/* Content Type Filters */}
+        {!isSearchMode && allMemories.length > 0 && (
+          <div className="max-w-4xl mx-auto mb-6">
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                onClick={() => setSelectedType('all')}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  selectedType === 'all'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+              >
+                All ({allMemories.length})
+              </button>
+              {getContentTypes().map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setSelectedType(type)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
+                    selectedType === type
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  }`}
+                >
+                  {type} ({stats?.by_type[type] || 0})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
@@ -90,32 +287,42 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Stats */}
-        {results.length > 0 && (
-          <div className="max-w-3xl mx-auto mb-6 text-center text-gray-600">
-            Found {results.length} memories
+        {/* Results Count */}
+        {displayMemories.length > 0 && (
+          <div className="max-w-4xl mx-auto mb-6 text-center text-gray-600">
+            {isSearchMode 
+              ? `Found ${results.length} memories` 
+              : `Showing ${displayMemories.length} ${selectedType === 'all' ? 'memories' : selectedType + 's'}`
+            }
+          </div>
+        )}
+
+        {/* Loading State */}
+        {(loading || loadingMemories) && (
+          <div className="text-center py-12 text-gray-500">
+            <p className="text-lg">Loading...</p>
           </div>
         )}
 
         {/* Results Grid */}
-        {results.length > 0 ? (
+        {!loading && !loadingMemories && displayMemories.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {results.map((item) => (
+            {displayMemories.map((item) => (
               <MemoryCard key={item.id} item={item} />
             ))}
           </div>
-        ) : !loading && query && (
+        ) : !loading && !loadingMemories && isSearchMode && (
           <div className="text-center py-12 text-gray-500">
             <p className="text-lg">No memories found. Try a different search.</p>
           </div>
         )}
 
-        {/* Empty State */}
-        {!query && results.length === 0 && (
+        {/* Empty State - No memories at all */}
+        {!loading && !loadingMemories && !isSearchMode && allMemories.length === 0 && (
           <div className="text-center py-12 text-gray-500">
-            <p className="text-lg mb-4">Start searching to find your memories</p>
+            <p className="text-lg mb-4">No memories yet. Start saving content with the extension!</p>
             <div className="space-y-2">
-              <p className="text-sm">Try searches like:</p>
+              <p className="text-sm">Or try searching:</p>
               <div className="flex flex-wrap justify-center gap-2 mt-4">
                 {[
                   'machine learning articles',
@@ -134,6 +341,19 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Empty State - No results for selected filter */}
+        {!loading && !loadingMemories && !isSearchMode && allMemories.length > 0 && displayMemories.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            <p className="text-lg">No {selectedType === 'all' ? 'memories' : selectedType + 's'} found.</p>
+            <button
+              onClick={() => setSelectedType('all')}
+              className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition-colors"
+            >
+              Show All Memories
+            </button>
           </div>
         )}
       </div>

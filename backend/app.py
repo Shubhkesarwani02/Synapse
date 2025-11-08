@@ -221,9 +221,11 @@ async def get_stats(user_id: str):
             }
         
         # Count by content type
+        # Check both 'type' (new format) and 'content_type' (old format) for compatibility
         by_type = {}
         for metadata in results['metadatas']:
-            content_type = metadata.get('content_type', 'note')
+            # New format uses 'type', old format uses 'content_type'
+            content_type = metadata.get('type') or metadata.get('content_type') or 'note'
             by_type[content_type] = by_type.get(content_type, 0) + 1
         
         # Count recent (last 7 days)

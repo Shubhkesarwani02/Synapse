@@ -73,7 +73,7 @@ document.getElementById('storeBtn').addEventListener('click', async () => {
         ('✅ Content script injected successfully');
         // Wait a moment for content script to fully load, then send message
         setTimeout(() => {
-            chrome.tabs.sendMessage(tab.id, { action: "store_context" }, (resp) => {
+            chrome.tabs.sendMessage(tab.id, { action: "store_context" }, async (resp) => {
                 // Check for runtime errors
                 if (chrome.runtime.lastError) {
                     console.error('❌ Runtime error:', chrome.runtime.lastError.message);
@@ -86,15 +86,46 @@ document.getElementById('storeBtn').addEventListener('click', async () => {
 
                 ("📥 Response received:", resp);
 
-                // Show feedback based on response
+                // Initial response is just acknowledgment, poll for async response
                 if (resp && resp.ok) {
-                    setButtonSuccess(storeBtn, '✅ Stored!');
-                    status.textContent = 'Conversation stored successfully!';
-                    status.className = 'status success';
-                    status.style.display = 'block';
+                    // Poll chrome.storage for the result
+                    const checkResult = setInterval(async () => {
+                        const storage = await chrome.storage.local.get(['action_response_store_context']);
+                        const result = storage.action_response_store_context;
 
-                    // Close popup after success
-                    closePopup(2000);
+                        if (result && result.timestamp > Date.now() - 10000) { // Result from last 10 seconds
+                            clearInterval(checkResult);
+                            chrome.storage.local.remove(['action_response_store_context']);
+
+                            if (result.ok) {
+                                setButtonSuccess(storeBtn, '✅ Stored!');
+                                status.textContent = result.message || 'Conversation stored successfully!';
+                                status.className = 'status success';
+                                status.style.display = 'block';
+                                closePopup(2000);
+                            } else {
+                                setButtonError(storeBtn, '❌ Failed');
+                                status.textContent = result.error || result.message || 'Failed to store conversation.';
+                                status.className = 'status error';
+                                status.style.display = 'block';
+                            }
+
+                            setTimeout(() => {
+                                storeBtn.querySelector('span').textContent = originalText;
+                                storeBtn.disabled = false;
+                                status.style.display = 'none';
+                            }, 2000);
+                        }
+                    }, 200); // Check every 200ms
+
+                    // Timeout after 10 seconds
+                    setTimeout(() => {
+                        clearInterval(checkResult);
+                        setButtonError(storeBtn, '❌ Timeout');
+                        status.textContent = 'Operation timed out. Please try again.';
+                        status.className = 'status error';
+                        status.style.display = 'block';
+                    }, 10000);
                 } else {
                     setButtonError(storeBtn, '❌ Failed');
                     if (resp && resp.error) {
@@ -104,14 +135,13 @@ document.getElementById('storeBtn').addEventListener('click', async () => {
                     }
                     status.className = 'status error';
                     status.style.display = 'block';
-                }
 
-                // Reset button after 2 seconds
-                setTimeout(() => {
-                    storeBtn.querySelector('span').textContent = originalText;
-                    storeBtn.disabled = false;
-                    status.style.display = 'none';
-                }, 2000);
+                    setTimeout(() => {
+                        storeBtn.querySelector('span').textContent = originalText;
+                        storeBtn.disabled = false;
+                        status.style.display = 'none';
+                    }, 2000);
+                }
             });
         }, 500); // Wait 500ms for content script to initialize
     }).catch((error) => {
@@ -255,7 +285,7 @@ async function loadContextById(contextId, tabId, itemElement) {
             action: "load_context_by_id",
             context_id: contextId,
             user_id: userId
-        }, (resp) => {
+        }, async (resp) => {
             if (chrome.runtime.lastError) {
                 console.error('❌ Runtime error:', chrome.runtime.lastError.message);
                 showContextError('Failed to load context. Please refresh the page.');
@@ -263,14 +293,39 @@ async function loadContextById(contextId, tabId, itemElement) {
                 return;
             }
 
+            // Initial response is just acknowledgment, poll for async response
             if (resp && resp.ok) {
-                // Close modal and show success
-                closeContextSelectionModal();
-                const status = document.getElementById('status');
-                status.textContent = 'Context loaded successfully!';
-                status.className = 'status success';
-                status.style.display = 'block';
-                closePopup(2000);
+                // Poll chrome.storage for the result
+                const checkResult = setInterval(async () => {
+                    const storage = await chrome.storage.local.get([`action_response_load_context_by_id_${contextId}`]);
+                    const result = storage[`action_response_load_context_by_id_${contextId}`];
+
+                    if (result && result.timestamp > Date.now() - 10000) { // Result from last 10 seconds
+                        clearInterval(checkResult);
+                        chrome.storage.local.remove([`action_response_load_context_by_id_${contextId}`]);
+
+                        if (result.ok) {
+                            // Close modal and show success
+                            closeContextSelectionModal();
+                            const status = document.getElementById('status');
+                            status.textContent = result.message || 'Context loaded successfully!';
+                            status.className = 'status success';
+                            status.style.display = 'block';
+                            itemElement.classList.remove('loading');
+                            closePopup(2000);
+                        } else {
+                            showContextError(result.error || result.message || 'Failed to load context');
+                            itemElement.classList.remove('loading');
+                        }
+                    }
+                }, 200); // Check every 200ms
+
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    clearInterval(checkResult);
+                    showContextError('Operation timed out. Please try again.');
+                    itemElement.classList.remove('loading');
+                }, 10000);
             } else {
                 showContextError(resp?.error || 'Failed to load context');
                 itemElement.classList.remove('loading');

@@ -22,11 +22,31 @@ window.addEventListener('message', async (event) => {
     if (!event.data || event.data.from !== MESSAGE_TYPES.FROM_SABKI_SOCH) return;
 
     try {
+        // Extract text content - ensure it's a string
+        let textContent = event.data.payload.data || event.data.payload.text || '';
+
+        // If it's an object, try to stringify it, but skip if it looks like an API response
+        if (typeof textContent === 'object') {
+            // Skip if it looks like a stats/API response object
+            if (textContent.total !== undefined || textContent.by_type !== undefined ||
+                textContent.items !== undefined || textContent.count !== undefined) {
+                // This looks like an API response, skip storing it
+                return;
+            }
+            // Otherwise, stringify it
+            textContent = JSON.stringify(textContent);
+        }
+
+        // Ensure it's a string and not empty
+        if (typeof textContent !== 'string' || !textContent.trim()) {
+            return;
+        }
+
         const user_id = await getOrCreateUserId();
         const payload = {
             user_id,
             source: location.hostname,
-            text: event.data.payload.data || event.data.payload.text || '',
+            text: textContent,
             url: location.href
         };
         // If any data found from injected (API Calls) send to background.js
@@ -54,6 +74,7 @@ window.addEventListener('message', async (event) => {
     try {
         if (event.data.type === MESSAGE_TYPES.GET_USER_ID) {
             const userId = await getOrCreateUserId();
+            console.log('📤 Content script sending user_id:', userId);
             window.postMessage({
                 type: MESSAGE_TYPES.USER_ID_RESPONSE,
                 userId: userId
@@ -161,26 +182,72 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 
             (async () => {
                 try {
+                    let result;
                     switch (request.action) {
                         case ACTIONS.STORE_CONTEXT:
-                            await handleStoreContext(BACKEND_URL);
+                            result = await handleStoreContext(BACKEND_URL);
+                            // Store result in chrome.storage for popup to retrieve
+                            chrome.storage.local.set({
+                                [`action_response_${request.action}`]: {
+                                    ok: result.success,
+                                    message: result.message,
+                                    error: result.error,
+                                    timestamp: Date.now()
+                                }
+                            });
                             break;
 
                         case ACTIONS.LOAD_CONTEXT:
-                            await handleLoadContext(BACKEND_URL, true, true);
+                            result = await handleLoadContext(BACKEND_URL, true, true);
+                            chrome.storage.local.set({
+                                [`action_response_${request.action}`]: {
+                                    ok: result.success,
+                                    message: result.message,
+                                    error: result.error,
+                                    timestamp: Date.now()
+                                }
+                            });
                             break;
 
                         case ACTIONS.LOAD_CONTEXT_BY_ID:
                             const userId = request.user_id || await getOrCreateUserId();
-                            await handleLoadContextById(request.context_id, userId, BACKEND_URL, false);
+                            result = await handleLoadContextById(request.context_id, userId, BACKEND_URL, false);
+                            // Store result in chrome.storage for popup to retrieve
+                            chrome.storage.local.set({
+                                [`action_response_${request.action}_${request.context_id}`]: {
+                                    ok: result.success,
+                                    message: result.message,
+                                    error: result.error,
+                                    timestamp: Date.now()
+                                }
+                            });
                             break;
 
                         case ACTIONS.INJECT_CONTEXT:
-                            await handleInjectContext(BACKEND_URL);
+                            result = await handleInjectContext(BACKEND_URL);
+                            chrome.storage.local.set({
+                                [`action_response_${request.action}`]: {
+                                    ok: result.success,
+                                    message: result.message,
+                                    error: result.error,
+                                    timestamp: Date.now()
+                                }
+                            });
                             break;
                     }
                 } catch (error) {
                     console.error(`❌ ${request.action} operation failed:`, error);
+                    // Store error result in chrome.storage
+                    const storageKey = request.context_id
+                        ? `action_response_${request.action}_${request.context_id}`
+                        : `action_response_${request.action}`;
+                    chrome.storage.local.set({
+                        [storageKey]: {
+                            ok: false,
+                            error: error.message,
+                            timestamp: Date.now()
+                        }
+                    });
                 }
             })();
 

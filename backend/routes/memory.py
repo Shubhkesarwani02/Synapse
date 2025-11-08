@@ -53,11 +53,27 @@ async def save_memory(memory: MemoryCreate):
         # 2. Detect content type and enrich metadata
         enriched_metadata = await enrich_metadata(memory)
         
-        # 3. Add media URLs to metadata
-        if media_urls:
-            enriched_metadata["media"] = media_urls
+        # 3. Generate title if not provided
+        if not memory.title:
+            # Generate a simple title from content or URL
+            if memory.content:
+                # Use first 100 chars of content as title
+                memory.title = memory.content[:100].strip()
+                if len(memory.content) > 100:
+                    memory.title += "..."
+            elif memory.url:
+                try:
+                    memory.title = memory.url.split('/')[-1] or "Untitled"
+                except:
+                    memory.title = "Untitled"
+            else:
+                memory.title = "Untitled"
         
-        # 4. Generate embedding using Gemini
+        # 4. Add media URLs to metadata (serialize as JSON string for ChromaDB)
+        if media_urls:
+            enriched_metadata["media"] = json.dumps(media_urls)
+        
+        # 5. Generate embedding using Gemini
         embedding_result = genai.embed_content(
             model=EMBEDDING_MODEL_NAME,
             content=memory.content,
@@ -65,28 +81,59 @@ async def save_memory(memory: MemoryCreate):
         )
         embedding = embedding_result['embedding']
         
-        # 5. Create memory ID and timestamp
+        # 6. Create memory ID and timestamp
         memory_id = str(uuid.uuid4())
         timestamp = datetime.now().isoformat()
         
-        # 6. Prepare metadata for ChromaDB (merge user metadata with enriched)
+        # 7. Prepare metadata for ChromaDB (merge user metadata with enriched)
+        # ChromaDB only accepts primitive types (str, int, float, bool, None)
+        # So we need to serialize complex types (lists, dicts) as JSON strings
+
+        print(f"User ID: {memory.user_id}")
         final_metadata = {
             "user_id": memory.user_id,
-            "url": memory.url,
+            "url": memory.url or "",
             "title": memory.title,
             "timestamp": timestamp,
             "time": timestamp,  # For compatibility with existing code
-            **enriched_metadata,
-            **(memory.metadata or {})  # User-provided metadata takes precedence
         }
         
-        # 7. Store in ChromaDB
+        # Add source if provided (backward compatibility)
+        if memory.source:
+            final_metadata["source"] = memory.source
+        
+        # Add enriched metadata (serialize complex types)
+        for key, value in enriched_metadata.items():
+            if isinstance(value, (list, dict)):
+                final_metadata[key] = json.dumps(value)
+            elif value is not None:
+                final_metadata[key] = value
+        
+        # Ensure content_type is set for compatibility with stats endpoint
+        # Use 'type' from enriched metadata, fallback to 'note'
+        if 'type' in final_metadata:
+            final_metadata['content_type'] = final_metadata['type']
+        elif 'content_type' not in final_metadata:
+            final_metadata['content_type'] = 'note'
+        
+        # Add user-provided metadata (serialize complex types)
+        if memory.metadata:
+            for key, value in memory.metadata.items():
+                if isinstance(value, (list, dict)):
+                    final_metadata[key] = json.dumps(value)
+                elif value is not None:
+                    final_metadata[key] = value
+        
+        # 8. Store in ChromaDB
         collection.add(
             ids=[memory_id],
             embeddings=[embedding],
             documents=[memory.content],
             metadatas=[final_metadata]
         )
+        
+        # Log for debugging
+        print(f"✅ Memory saved - ID: {memory_id}, User ID: {memory.user_id}, Type: {final_metadata.get('type', 'unknown')}, Title: {memory.title[:50]}")
         
         return {
             "id": memory_id,
@@ -179,8 +226,8 @@ async def enrich_metadata(memory: MemoryCreate) -> dict:
     try:
         # First try AI-based enrichment
         prompt = METADATA_ENRICHMENT_PROMPT.format(
-            url=memory.url,
-            title=memory.title,
+            url=memory.url or "",
+            title=memory.title or "",
             content=memory.content[:1500]  # Limit content length for prompt
         )
         
@@ -211,8 +258,8 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
     Fallback content detection using URL patterns and content analysis
     """
     metadata = {"type": "article"}  # Default type
-    url_lower = url.lower()
-    content_lower = content.lower()
+    url_lower = (url or "").lower()
+    content_lower = (content or "").lower()
     
     # YouTube videos
     if "youtube.com" in url_lower or "youtu.be" in url_lower:
@@ -220,14 +267,20 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
         metadata["platform"] = "youtube"
         
         # Extract video ID
-        if "v=" in url:
-            video_id = url.split("v=")[1].split("&")[0]
-            metadata["video_id"] = video_id
-            metadata["thumbnail"] = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-        elif "youtu.be/" in url:
-            video_id = url.split("youtu.be/")[1].split("?")[0]
-            metadata["video_id"] = video_id
-            metadata["thumbnail"] = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+        if url and "v=" in url:
+            try:
+                video_id = url.split("v=")[1].split("&")[0]
+                metadata["video_id"] = video_id
+                metadata["thumbnail"] = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+            except:
+                pass
+        elif url and "youtu.be/" in url:
+            try:
+                video_id = url.split("youtu.be/")[1].split("?")[0]
+                metadata["video_id"] = video_id
+                metadata["thumbnail"] = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+            except:
+                pass
     
     # Vimeo videos
     elif "vimeo.com" in url_lower:
@@ -282,17 +335,25 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
         metadata["platform"] = "github"
         
         # Extract repo info
-        parts = url.split("github.com/")
-        if len(parts) > 1:
-            repo_path = parts[1].split("/")
-            if len(repo_path) >= 2:
-                metadata["repo_owner"] = repo_path[0]
-                metadata["repo_name"] = repo_path[1]
+        if url:
+            try:
+                parts = url.split("github.com/")
+                if len(parts) > 1:
+                    repo_path = parts[1].split("/")
+                    if len(repo_path) >= 2:
+                        metadata["repo_owner"] = repo_path[0]
+                        metadata["repo_name"] = repo_path[1]
+            except:
+                pass
     
     # Medium, Dev.to, Substack (Articles)
     elif any(site in url_lower for site in ["medium.com", "dev.to", "substack.com", "hashnode"]):
         metadata["type"] = "article"
-        metadata["platform"] = url.split("//")[1].split("/")[0]
+        if url:
+            try:
+                metadata["platform"] = url.split("//")[1].split("/")[0]
+            except:
+                metadata["platform"] = "unknown"
     
     # Wikipedia
     elif "wikipedia.org" in url_lower:
@@ -320,20 +381,21 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
         
         # Try to extract task list
         tasks = []
-        lines = content.split('\n')
-        for line in lines:
-            if '[ ]' in line or '[x]' in line:
-                task_text = line.replace('[ ]', '').replace('[x]', '').strip()
-                if task_text:
-                    tasks.append({
-                        "text": task_text,
-                        "completed": '[x]' in line
-                    })
+        if content:
+            lines = content.split('\n')
+            for line in lines:
+                if '[ ]' in line or '[x]' in line:
+                    task_text = line.replace('[ ]', '').replace('[x]', '').strip()
+                    if task_text:
+                        tasks.append({
+                            "text": task_text,
+                            "completed": '[x]' in line
+                        })
         if tasks:
             metadata["tasks"] = tasks
     
     # Quote detection
-    elif content.startswith('"') or content.startswith('"') or 'quote' in title.lower():
+    elif (content and (content.startswith('"') or content.startswith('"'))) or (title and 'quote' in title.lower()):
         metadata["type"] = "quote"
     
     return metadata

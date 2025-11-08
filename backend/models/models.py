@@ -100,11 +100,14 @@ class SearchResult(BaseModel):
 class MemoryCreate(BaseModel):
     """Request model for creating memories with enhanced metadata"""
     user_id: str
-    content: str
-    url: str
-    title: str
+    content: Optional[str] = None
+    url: Optional[str] = None
+    title: Optional[str] = None
     raw_html: Optional[str] = None
     metadata: Optional[dict] = None
+    # Backward compatibility fields
+    text: Optional[str] = None
+    source: Optional[str] = None
     
     @field_validator('user_id')
     @classmethod
@@ -118,10 +121,28 @@ class MemoryCreate(BaseModel):
     @field_validator('content')
     @classmethod
     def validate_content(cls, v):
-        if not v or not v.strip():
-            raise ValueError('content cannot be empty')
+        if v is None:
+            return v
         v = v.strip()
         if len(v) > MAX_TEXT_LENGTH:
             v = v[:MAX_TEXT_LENGTH]
             print(f"Warning: Content truncated to {MAX_TEXT_LENGTH} characters")
         return v
+    
+    @field_validator('text')
+    @classmethod
+    def validate_text(cls, v):
+        if v is None:
+            return v
+        v = v.strip()
+        if len(v) > MAX_TEXT_LENGTH:
+            v = v[:MAX_TEXT_LENGTH]
+            print(f"Warning: Text truncated to {MAX_TEXT_LENGTH} characters")
+        return v
+    
+    def model_post_init(self, __context):
+        """Ensure we have content from either 'content' or 'text' field"""
+        if not self.content and self.text:
+            self.content = self.text
+        if not self.content:
+            raise ValueError('Either content or text field must be provided')

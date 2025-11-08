@@ -5,7 +5,7 @@ interface MemoryCardProps {
     url: string;
     title: string;
     metadata: any;
-    similarity_score: number;
+    similarity_score?: number;
     timestamp: string;
   };
 }
@@ -183,18 +183,20 @@ export default function MemoryCard({ item }: MemoryCardProps) {
         <span>{formatDate(item.timestamp)}</span>
       </div>
 
-      {/* Similarity Score */}
-      <div className="mt-2 flex items-center gap-2">
-        <div className="flex-1 bg-gray-200 rounded-full h-2">
-          <div 
-            className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full"
-            style={{ width: `${item.similarity_score * 100}%` }}
-          />
+      {/* Similarity Score - Only show for search results */}
+      {item.similarity_score !== undefined && (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="flex-1 bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full"
+              style={{ width: `${item.similarity_score * 100}%` }}
+            />
+          </div>
+          <span className="text-xs text-gray-500">
+            {(item.similarity_score * 100).toFixed(0)}%
+          </span>
         </div>
-        <span className="text-xs text-gray-500">
-          {(item.similarity_score * 100).toFixed(0)}%
-        </span>
-      </div>
+      )}
 
       {/* View Original Link */}
       <a
