@@ -26,30 +26,8 @@
         return;
     }
 
-    const ALLOWED_DOMAINS = [
-        'chat.openai.com',
-        'chatgpt.com',
-        'claude.ai',
-        'gemini.google.com',
-        'chat.deepseek.com',
-        'www.deepseek.com',
-        'deepseek.com',
-        'perplexity.ai',
-        'poe.com',
-        'huggingface.co',
-        'huggingface.com'
-    ];
-
-    // Check if current domain is whitelisted
-    const hostname = window.location.hostname;
-    const isWhitelisted = ALLOWED_DOMAINS.some(domain =>
-        hostname === domain || hostname.endsWith('.' + domain)
-    );
-
-    if (!isWhitelisted) {
-        return;
-    }
-
+    // Extension now works on all websites - no domain restrictions
+    // The UI will adapt based on the page content and available input fields
     window.__SABKI_SOCH_UI_LOADED__ = true;
 
     const createFloatingButton = () => {

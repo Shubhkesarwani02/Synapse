@@ -1,25 +1,10 @@
 // Script injection utilities
 
-// Whitelist of allowed domains for UI injection
-const ALLOWED_DOMAINS = [
-    'chat.openai.com',
-    'chatgpt.com',
-    'claude.ai',
-    'gemini.google.com',
-    'chat.deepseek.com',
-    'www.deepseek.com',
-    'deepseek.com',
-    'perplexity.ai',
-    'poe.com',
-    'huggingface.co',
-    'huggingface.com'
-];
-
+// UI injection is now enabled for all domains
+// The UI component will adapt based on the page content
 function isWhitelistedDomain() {
-    const hostname = window.location.hostname;
-    return ALLOWED_DOMAINS.some(domain =>
-        hostname === domain || hostname.endsWith('.' + domain)
-    );
+    // Return true for all domains - no whitelist restrictions
+    return true;
 }
 
 function injectScript(scriptName, fallbackPath = null) {
