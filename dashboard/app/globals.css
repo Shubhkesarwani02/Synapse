@@ -2,33 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Monochrome design tokens */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* Light theme (White) */
+  --bg: 255 255 255;           /* #ffffff */
+  --fg: 17 24 39;              /* #111827 */
+  --muted: 107 114 128;        /* #6b7280 */
+  --card: 250 250 250;         /* #fafafa */
+  --border: 229 231 235;       /* #e5e7eb */
+  --elev: 243 244 246;         /* #f3f4f6 */
+  --btn: 23 23 23;             /* #171717 */
+  --btn-fg: 255 255 255;       /* #ffffff */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+/* Dark theme (Black) */
+html[data-theme="dark"] {
+  --bg: 10 10 10;              /* near black */
+  --fg: 243 244 246;           /* gray-100 */
+  --muted: 156 163 175;        /* gray-400 */
+  --card: 17 17 17;            /* #111111 */
+  --border: 38 38 38;          /* #262626 */
+  --elev: 24 24 24;            /* subtle elev */
+  --btn: 245 245 245;          /* gray-100 */
+  --btn-fg: 10 10 10;          /* near black */
+}
+
+/* Base styles */
+html, body {
+  height: 100%;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: rgb(var(--fg));
+  background-color: rgb(var(--bg));
 }
 
+/* Typography tweaks for a professional look */
+@layer base {
+  h1 { @apply tracking-tight font-semibold; }
+  h2 { @apply tracking-tight font-semibold; }
+  h3 { @apply tracking-tight font-semibold; }
+  p  { @apply leading-7; }
+}
+
+/* Reusable utilities */
+.container-pro {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.card {
+  background-color: rgb(var(--card));
+  border: 1px solid rgb(var(--border));
+  border-radius: 0.75rem; /* xl */
+}
+
+.btn-primary {
+  background-color: rgb(var(--btn));
+  color: rgb(var(--btn-fg));
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover {
+  filter: brightness(0.9);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: rgb(var(--fg));
+  border: 1px solid rgb(var(--border));
+}
+
+.badge {
+  background-color: rgb(var(--elev));
+  color: rgb(var(--fg));
+  border: 1px solid rgb(var(--border));
+}
+
+/* Line clamp utility (Safari-friendly) */
 .line-clamp-3 {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+  line-clamp: 3;
   overflow: hidden;
 }
