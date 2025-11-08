@@ -509,9 +509,9 @@
         footerText.textContent = 'v1.0.0 MVP - Vibe Coded by';
 
         const footerLink = document.createElement('a');
-        footerLink.href = 'https://github.com/VrajDarji';
+        footerLink.href = 'https://github.com/Shubhkesarwani02';
         footerLink.target = '_blank';
-        footerLink.textContent = ' Vraj';
+        footerLink.textContent = ' Shubh Kesarwani';
         Object.assign(footerLink.style, {
             color: '#666',
             textDecoration: 'none'

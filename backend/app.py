@@ -127,14 +127,20 @@ init_search_router(collection)
 init_memory_router(collection)
 
 # Include routers
+# Include routers
 app.include_router(search_router, prefix="/api", tags=["search"])
 app.include_router(memory_router, prefix="/api", tags=["memory"])
 
+# Mount /store endpoint at root for backward compatibility with extension
+from routes.memory import save_memory as memory_save_memory
 
 @app.post("/store")
-async def store(req: StoreRequest):
-    """Store conversation data with auto-generated title"""
-    return await store_conversation(req, collection, gemini_ef)
+async def store_legacy(memory: MemoryCreate):
+    """
+    Legacy /store endpoint for backward compatibility.
+    Now uses the new MemoryCreate model and supports media extraction.
+    """
+    return await memory_save_memory(memory)
 
 @app.post("/api/save")
 async def save_content(req: StoreRequest):
