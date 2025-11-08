@@ -19,7 +19,192 @@
         LOAD_CONTEXT_BY_ID: 'load_context_by_id',
         CLEAR_DATA: 'clear_data',
         INJECT_CONTEXT: 'inject_context',
-        DELETE_CONTEXT: 'delete_context'
+        DELETE_CONTEXT: 'delete_context',
+        SAVE_CONTENT: 'save_content'
+    };
+
+    // ===== CONTENT DETECTION UTILITIES =====
+    const detectContentType = () => {
+        const url = window.location.href;
+        const domain = window.location.hostname;
+        
+        // Product detection (Amazon, eBay, etc.)
+        if (domain.includes('amazon.') || domain.includes('ebay.') || 
+            domain.includes('shopify.') || domain.includes('etsy.')) {
+            return { type: 'product', extractor: extractProduct };
+        }
+        
+        // Video detection (YouTube, Vimeo)
+        if (domain.includes('youtube.com') || domain.includes('vimeo.com')) {
+            return { type: 'video', extractor: extractVideo };
+        }
+        
+        // Article detection (Medium, Substack, blogs)
+        if (isArticlePage()) {
+            return { type: 'article', extractor: extractArticle };
+        }
+        
+        // Default to note
+        return { type: 'note', extractor: extractGeneric };
+    };
+
+    const isArticlePage = () => {
+        const indicators = [
+            document.querySelector('article'),
+            document.querySelector('[role="article"]'),
+            document.querySelector('.post-content'),
+            document.querySelector('.article-content'),
+            document.querySelector('meta[property="og:type"][content="article"]')
+        ];
+        return indicators.some(el => el !== null);
+    };
+
+    const extractProduct = () => {
+        const product = {
+            type: 'product',
+            title: '',
+            price: null,
+            currency: 'USD',
+            image_url: '',
+            description: '',
+            url: window.location.href
+        };
+
+        const titleSelectors = ['#productTitle', 'h1[itemprop="name"]', '.product-title', 'h1.title', 'meta[property="og:title"]'];
+        for (const selector of titleSelectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                product.title = el.getAttribute('content') || el.textContent.trim();
+                break;
+            }
+        }
+
+        const priceSelectors = ['.a-price-whole', '[itemprop="price"]', '.price', 'meta[property="og:price:amount"]'];
+        for (const selector of priceSelectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                const priceText = el.getAttribute('content') || el.textContent;
+                const priceMatch = priceText.match(/[\d,]+\.?\d*/);
+                if (priceMatch) {
+                    product.price = parseFloat(priceMatch[0].replace(',', ''));
+                    break;
+                }
+            }
+        }
+
+        const imageSelectors = ['#landingImage', '[itemprop="image"]', '.product-image img', 'meta[property="og:image"]'];
+        for (const selector of imageSelectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                product.image_url = el.getAttribute('content') || el.src || el.getAttribute('data-src');
+                break;
+            }
+        }
+
+        const descSelectors = ['#feature-bullets', '[itemprop="description"]', '.product-description', 'meta[property="og:description"]'];
+        for (const selector of descSelectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                product.description = el.getAttribute('content') || el.textContent.trim().slice(0, 500);
+                break;
+            }
+        }
+
+        return product;
+    };
+
+    const extractVideo = () => {
+        const video = {
+            type: 'video',
+            title: '',
+            duration: null,
+            thumbnail_url: '',
+            author: '',
+            description: '',
+            url: window.location.href
+        };
+
+        if (window.location.hostname.includes('youtube.com')) {
+            video.title = document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent.trim() ||
+                          document.querySelector('meta[property="og:title"]')?.content;
+            video.author = document.querySelector('#owner-name a')?.textContent.trim();
+            video.thumbnail_url = document.querySelector('meta[property="og:image"]')?.content;
+            video.description = document.querySelector('#description')?.textContent.trim().slice(0, 500);
+            
+            const durationText = document.querySelector('.ytp-time-duration')?.textContent;
+            if (durationText) {
+                const parts = durationText.split(':').map(Number);
+                video.duration = parts.length === 3 
+                    ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+                    : parts[0] * 60 + parts[1];
+            }
+        }
+
+        return video;
+    };
+
+    const extractArticle = () => {
+        const article = {
+            type: 'article',
+            title: '',
+            author: '',
+            published_date: null,
+            read_time: null,
+            image_url: '',
+            content: '',
+            url: window.location.href
+        };
+
+        article.title = document.querySelector('h1')?.textContent.trim() ||
+                        document.querySelector('meta[property="og:title"]')?.content;
+
+        const authorSelectors = ['[rel="author"]', '.author-name', '[itemprop="author"]', 'meta[name="author"]'];
+        for (const selector of authorSelectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                article.author = el.getAttribute('content') || el.textContent.trim();
+                break;
+            }
+        }
+
+        const dateSelectors = ['time[datetime]', '[itemprop="datePublished"]', 'meta[property="article:published_time"]'];
+        for (const selector of dateSelectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                article.published_date = el.getAttribute('datetime') || el.getAttribute('content') || el.textContent;
+                break;
+            }
+        }
+
+        article.image_url = document.querySelector('meta[property="og:image"]')?.content;
+
+        const contentSelectors = ['article', '.post-content', '.article-content', '[role="article"]', 'main'];
+        for (const selector of contentSelectors) {
+            const el = document.querySelector(selector);
+            if (el) {
+                const text = Array.from(el.querySelectorAll('p'))
+                    .map(p => p.textContent.trim())
+                    .filter(t => t.length > 50)
+                    .join('\n\n');
+                
+                article.content = text.slice(0, 2000);
+                const wordCount = text.split(/\s+/).length;
+                article.read_time = Math.ceil(wordCount / 200);
+                break;
+            }
+        }
+
+        return article;
+    };
+
+    const extractGeneric = () => {
+        return {
+            type: 'note',
+            title: document.title,
+            content: document.body.innerText.slice(0, 2000),
+            url: window.location.href,
+            image_url: document.querySelector('meta[property="og:image"]')?.content
+        };
     };
 
     if (window.__SABKI_SOCH_UI_LOADED__) {
@@ -158,7 +343,17 @@
             marginBottom: '24px'
         });
 
+        // Detect content type for smart save button
+        const { type: contentType } = detectContentType();
+        const typeEmojis = {
+            product: '🛍️ Save Product',
+            video: '🎥 Save Video',
+            article: '📄 Save Article',
+            note: '📝 Save Note'
+        };
+
         const buttons = [
+            { id: 'sabkisoch-smart-save-btn', text: typeEmojis[contentType], isDanger: false, isSmart: true },
             { id: 'sabkisoch-store-btn', text: 'Store Current Chat', isDanger: false },
             { id: 'sabkisoch-inject-btn', text: 'Load Context to Chat', isDanger: false },
             { id: 'sabkisoch-clear-btn', text: 'Clear My Data', isDanger: true }
@@ -169,18 +364,21 @@
             button.id = btnData.id;
             button.textContent = btnData.text;
             button.dataset.originalText = btnData.text;
+            if (btnData.isSmart) {
+                button.dataset.isSmart = 'true';
+            }
 
             Object.assign(button.style, {
                 width: '100%',
                 padding: '15px 20px',
-                border: btnData.isDanger ? '1.5px solid #fecaca' : '1.5px solid #e5e5e5',
+                border: btnData.isDanger ? '1.5px solid #fecaca' : (btnData.isSmart ? '1.5px solid #bbf7d0' : '1.5px solid #e5e5e5'),
                 borderRadius: '12px',
                 fontSize: '14px',
                 fontWeight: '500',
                 cursor: 'pointer',
-                background: 'rgba(255, 255, 255, 0.8)',
+                background: btnData.isSmart ? 'rgba(240, 253, 244, 0.9)' : 'rgba(255, 255, 255, 0.8)',
                 backdropFilter: 'blur(10px)',
-                color: btnData.isDanger ? '#991b1b' : '#1a1a1a',
+                color: btnData.isDanger ? '#991b1b' : (btnData.isSmart ? '#166534' : '#1a1a1a'),
                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                 transition: 'all 0.2s ease',
                 fontFamily: 'inherit'
@@ -342,15 +540,18 @@
 
         const modalButtons = modal.querySelectorAll('button');
         modalButtons.forEach(btn => {
+            const isSmart = btn.dataset.isSmart === 'true';
+            const isDanger = btn.id === 'sabkisoch-clear-btn';
+            
             btn.addEventListener('mouseenter', () => {
-                btn.style.background = 'rgba(249, 249, 249, 0.95)';
-                btn.style.borderColor = btn.id === 'sabkisoch-clear-btn' ? '#fca5a5' : '#d0d0d0';
+                btn.style.background = isSmart ? 'rgba(220, 252, 231, 0.95)' : 'rgba(249, 249, 249, 0.95)';
+                btn.style.borderColor = isDanger ? '#fca5a5' : (isSmart ? '#86efac' : '#d0d0d0');
                 btn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
                 btn.style.transform = 'translateY(-1px)';
             });
             btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'rgba(255, 255, 255, 0.8)';
-                btn.style.borderColor = btn.id === 'sabkisoch-clear-btn' ? '#fecaca' : '#e5e5e5';
+                btn.style.background = isSmart ? 'rgba(240, 253, 244, 0.9)' : 'rgba(255, 255, 255, 0.8)';
+                btn.style.borderColor = isDanger ? '#fecaca' : (isSmart ? '#bbf7d0' : '#e5e5e5');
                 btn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
                 btn.style.transform = 'translateY(0)';
             });
@@ -386,6 +587,15 @@
     };
 
     const connectButtonActions = () => {
+        // Smart save button
+        const smartSaveBtn = document.getElementById('sabkisoch-smart-save-btn');
+        if (smartSaveBtn) {
+            smartSaveBtn.addEventListener('click', async () => {
+                setButtonLoading('sabkisoch-smart-save-btn', 'Saving...');
+                await saveContentToBackend();
+            });
+        }
+
         document.getElementById('sabkisoch-store-btn').addEventListener('click', () => {
             setButtonLoading('sabkisoch-store-btn', 'Storing...');
             window.postMessage({
@@ -409,6 +619,72 @@
         });
     };
 
+    // ===== SMART SAVE FUNCTIONALITY =====
+    const saveContentToBackend = async () => {
+        const { type, extractor } = detectContentType();
+        const contentData = extractor();
+        
+        // Get user ID - try multiple sources
+        const userId = localStorage.getItem('AI_CONTEXT_USER') || 
+                      document.AI_CONTEXT || 
+                      'demo_user';
+        
+        try {
+            const response = await fetch('http://localhost:8000/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: contentData.content || contentData.description || contentData.title,
+                    user_id: userId,
+                    url: contentData.url,
+                    title: contentData.title,
+                    content_type: contentData.type,
+                    metadata: JSON.stringify(contentData)
+                })
+            });
+            
+            if (response.ok) {
+                setButtonSuccess('sabkisoch-smart-save-btn', '✅ Saved!');
+                showNotification(`${contentData.type} saved to SabkiSoch! 🧠`, 'success');
+            } else {
+                setButtonError('sabkisoch-smart-save-btn', '❌ Failed');
+                showNotification('Failed to save. Please try again.', 'error');
+            }
+        } catch (error) {
+            console.error('Save failed:', error);
+            setButtonError('sabkisoch-smart-save-btn', '❌ Failed');
+            showNotification('Failed to save. Check connection.', 'error');
+        }
+    };
+
+    const showNotification = (message, type = 'success') => {
+        const notif = document.createElement('div');
+        notif.className = `sabkisoch-notification ${type}`;
+        notif.textContent = message;
+        notif.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : '#ef4444'};
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10001;
+            animation: slideIn 0.3s ease;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+        `;
+        
+        document.body.appendChild(notif);
+        
+        setTimeout(() => {
+            notif.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notif.remove(), 300);
+        }, 3000);
+    };
+
     const setButtonLoading = (buttonId, loadingText) => {
         const button = document.getElementById(buttonId);
         if (!button) return;
@@ -424,6 +700,7 @@
         const button = document.getElementById(buttonId);
         if (!button) return;
 
+        const isSmart = button.dataset.isSmart === 'true';
         button.textContent = successText;
         button.style.background = '#f0fdf4';
         button.style.borderColor = '#bbf7d0';
@@ -434,9 +711,9 @@
             button.disabled = false;
             button.style.opacity = '1';
             button.style.cursor = 'pointer';
-            button.style.background = 'rgba(255, 255, 255, 0.8)';
-            button.style.borderColor = button.id === 'sabkisoch-clear-btn' ? '#fecaca' : '#e5e5e5';
-            button.style.color = button.id === 'sabkisoch-clear-btn' ? '#991b1b' : '#1a1a1a';
+            button.style.background = isSmart ? 'rgba(240, 253, 244, 0.9)' : 'rgba(255, 255, 255, 0.8)';
+            button.style.borderColor = button.id === 'sabkisoch-clear-btn' ? '#fecaca' : (isSmart ? '#bbf7d0' : '#e5e5e5');
+            button.style.color = button.id === 'sabkisoch-clear-btn' ? '#991b1b' : (isSmart ? '#166534' : '#1a1a1a');
         }, 2000);
     };
 
@@ -444,6 +721,7 @@
         const button = document.getElementById(buttonId);
         if (!button) return;
 
+        const isSmart = button.dataset.isSmart === 'true';
         button.textContent = errorText;
         button.style.background = '#fef2f2';
         button.style.borderColor = '#fecaca';
@@ -454,9 +732,9 @@
             button.disabled = false;
             button.style.opacity = '1';
             button.style.cursor = 'pointer';
-            button.style.background = 'rgba(255, 255, 255, 0.8)';
-            button.style.borderColor = button.id === 'sabkisoch-clear-btn' ? '#fecaca' : '#e5e5e5';
-            button.style.color = button.id === 'sabkisoch-clear-btn' ? '#991b1b' : '#1a1a1a';
+            button.style.background = isSmart ? 'rgba(240, 253, 244, 0.9)' : 'rgba(255, 255, 255, 0.8)';
+            button.style.borderColor = button.id === 'sabkisoch-clear-btn' ? '#fecaca' : (isSmart ? '#bbf7d0' : '#e5e5e5');
+            button.style.color = button.id === 'sabkisoch-clear-btn' ? '#991b1b' : (isSmart ? '#166534' : '#1a1a1a');
         }, 3000);
     };
 

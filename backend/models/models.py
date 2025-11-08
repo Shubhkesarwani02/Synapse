@@ -19,6 +19,9 @@ class StoreRequest(BaseModel):
     source: str = "unknown"
     text: str
     url: Optional[str] = None
+    title: Optional[str] = None
+    content_type: Optional[str] = "note"
+    metadata: Optional[str] = None
     
     @field_validator('user_id')
     @classmethod

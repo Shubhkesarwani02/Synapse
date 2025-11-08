@@ -96,6 +96,136 @@ async def store(req: StoreRequest):
     """Store conversation data with auto-generated title"""
     return await store_conversation(req, collection, gemini_ef)
 
+@app.post("/api/save")
+async def save_content(req: StoreRequest):
+    """
+    Save content with content type and metadata support.
+    Compatible with extension's smart save feature.
+    """
+    try:
+        # Generate embedding using Gemini
+        embedding_result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=req.text,
+            task_type="retrieval_document"
+        )
+        embedding = embedding_result['embedding']
+        
+        # Create unique ID and timestamp
+        import uuid
+        from datetime import datetime
+        
+        memory_id = str(uuid.uuid4())
+        timestamp = datetime.now().isoformat()
+        
+        # Parse metadata if it's a JSON string
+        metadata_dict = {}
+        if req.metadata:
+            try:
+                import json
+                metadata_dict = json.loads(req.metadata) if isinstance(req.metadata, str) else req.metadata
+            except:
+                pass
+        
+        # Prepare metadata for ChromaDB
+        final_metadata = {
+            "user_id": req.user_id,
+            "source": req.source,
+            "url": req.url or "",
+            "title": req.title or "Untitled",
+            "timestamp": timestamp,
+            "time": timestamp,
+            "content_type": req.content_type or "note",
+            **metadata_dict
+        }
+        
+        # Store in ChromaDB
+        collection.add(
+            ids=[memory_id],
+            embeddings=[embedding],
+            documents=[req.text],
+            metadatas=[final_metadata]
+        )
+        
+        return {
+            "id": memory_id,
+            "status": "success",
+            "message": f"{req.content_type or 'Content'} saved successfully",
+            "content_type": req.content_type
+        }
+        
+    except Exception as e:
+        print(f"Error saving content: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save content: {str(e)}")
+
+@app.get("/api/stats")
+async def get_stats(user_id: str):
+    """Get statistics for a user's saved content"""
+    try:
+        # Get all items for user
+        results = collection.get(
+            where={"user_id": user_id}
+        )
+        
+        if not results or not results['ids']:
+            return {
+                "total": 0,
+                "by_type": {},
+                "recent_count": 0
+            }
+        
+        # Count by content type
+        by_type = {}
+        for metadata in results['metadatas']:
+            content_type = metadata.get('content_type', 'note')
+            by_type[content_type] = by_type.get(content_type, 0) + 1
+        
+        # Count recent (last 7 days)
+        from datetime import datetime, timedelta
+        week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+        recent_count = sum(1 for m in results['metadatas'] if m.get('timestamp', '') >= week_ago)
+        
+        return {
+            "total": len(results['ids']),
+            "by_type": by_type,
+            "recent_count": recent_count
+        }
+        
+    except Exception as e:
+        print(f"Error getting stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+@app.delete("/api/delete/{memory_id}")
+async def delete_memory(
+    memory_id: str,
+    user_id: str = Query(..., description="User ID to verify ownership")
+):
+    """Delete a specific memory by ID"""
+    try:
+        # Verify ownership
+        result = collection.get(
+            ids=[memory_id],
+            where={"user_id": user_id}
+        )
+        
+        if not result or not result['ids']:
+            raise HTTPException(status_code=404, detail="Memory not found or access denied")
+        
+        # Delete the memory
+        collection.delete(ids=[memory_id])
+        
+        return {
+            "status": "success",
+            "message": "Memory deleted successfully",
+            "id": memory_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting memory: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete memory: {str(e)}")
+
 @app.get("/get_all")
 async def get_all(user_id: str):
     return await get_all_conversations(user_id, collection)
@@ -159,6 +289,9 @@ async def root():
         "description": API_DESCRIPTION,
         "endpoints": {
             "POST /store": "Store conversation data with auto-generated title",
+            "POST /api/save": "Save content with content type and metadata (smart save)",
+            "GET /api/stats": "Get user statistics by content type",
+            "DELETE /api/delete/{memory_id}": "Delete a specific memory by ID",
             "GET /get_all": "Retrieve all conversations for a user",
             "POST /api/search": "Semantic search for memories",
             "POST /api/search/nl": "Natural language search with filters",
