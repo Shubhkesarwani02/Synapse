@@ -18,7 +18,7 @@ class StoreRequest(BaseModel):
     user_id: str
     source: str = "unknown"
     text: str
-    url: str | None = None
+    url: Optional[str] = None
     
     @field_validator('user_id')
     @classmethod
@@ -66,3 +66,59 @@ class ContextRequest(BaseModel):
     """Request model for generating context from conversations"""
     user_id: str
     max_length: Optional[int] = 2000  # Max length for generated context
+
+
+class SearchRequest(BaseModel):
+    """Request model for semantic search"""
+    query: str
+    user_id: str
+    limit: Optional[int] = 20
+    filters: Optional[dict] = None
+    
+    @field_validator('query')
+    @classmethod
+    def validate_query(cls, v):
+        if not v or not v.strip():
+            raise ValueError('query cannot be empty')
+        return v.strip()
+
+
+class SearchResult(BaseModel):
+    """Response model for search results"""
+    id: str
+    content: str
+    url: str
+    title: str
+    metadata: dict
+    similarity_score: float
+    timestamp: str
+
+
+class MemoryCreate(BaseModel):
+    """Request model for creating memories with enhanced metadata"""
+    user_id: str
+    content: str
+    url: str
+    title: str
+    raw_html: Optional[str] = None
+    metadata: Optional[dict] = {}
+    
+    @field_validator('user_id')
+    @classmethod
+    def validate_user_id(cls, v):
+        if not v or not v.strip():
+            raise ValueError('user_id cannot be empty')
+        if len(v) > MAX_USER_ID_LENGTH:
+            raise ValueError(f'user_id too long (max {MAX_USER_ID_LENGTH} characters)')
+        return v.strip()
+    
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v):
+        if not v or not v.strip():
+            raise ValueError('content cannot be empty')
+        v = v.strip()
+        if len(v) > MAX_TEXT_LENGTH:
+            v = v[:MAX_TEXT_LENGTH]
+            print(f"Warning: Content truncated to {MAX_TEXT_LENGTH} characters")
+        return v
