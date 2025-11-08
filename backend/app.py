@@ -1,12 +1,15 @@
 # backend/app.py
 import os
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import chromadb
 from chromadb.config import Settings
 import google.generativeai as genai
 from dotenv import load_dotenv
 from chromadb.errors import NotFoundError
+import json
 
 # Import constants
 from constants import (
@@ -68,6 +71,43 @@ gemini_ef = create_gemini_embedding_function()
 
 
 app = FastAPI(title=API_TITLE, version=API_VERSION)
+
+# Add global exception handler for 422 validation errors (debugging)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Custom handler for 422 validation errors.
+    Logs the request body and validation errors for debugging.
+    """
+    # Try to get the request body
+    try:
+        body = await request.body()
+        body_str = body.decode('utf-8')
+        try:
+            body_json = json.loads(body_str)
+        except:
+            body_json = body_str
+    except:
+        body_json = "Could not read body"
+    
+    # Log the error details
+    print("=" * 80)
+    print("🚨 VALIDATION ERROR (422)")
+    print(f"URL: {request.url}")
+    print(f"Method: {request.method}")
+    print(f"Headers: {dict(request.headers)}")
+    print(f"Body: {body_json}")
+    print(f"Errors: {exc.errors()}")
+    print("=" * 80)
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "body": body_json,
+            "message": "Validation error - check logs for details"
+        }
+    )
 
 # Add CORS middleware to allow requests from anywhere
 app.add_middleware(

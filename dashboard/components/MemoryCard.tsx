@@ -84,6 +84,46 @@ export default function MemoryCard({ item }: MemoryCardProps) {
         />
       )}
 
+      {/* Media Gallery (images and videos from metadata.media) */}
+      {item.metadata.media && item.metadata.media.length > 0 && (
+        <div className="mb-4">
+          <div className="grid grid-cols-2 gap-2">
+            {item.metadata.media.slice(0, 4).map((mediaItem: any, idx: number) => (
+              <div key={idx} className="relative rounded-lg overflow-hidden">
+                {mediaItem.type === 'image' ? (
+                  <img
+                    src={mediaItem.url}
+                    alt={`Media ${idx + 1}`}
+                    className="w-full h-32 object-cover hover:scale-110 transition-transform duration-300"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : mediaItem.type === 'video' ? (
+                  <div className="relative w-full h-32 bg-gray-900 flex items-center justify-center">
+                    <a 
+                      href={mediaItem.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-white hover:text-blue-400 transition-colors"
+                    >
+                      <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {item.metadata.media.length > 4 && (
+            <p className="text-xs text-gray-500 mt-2">
+              +{item.metadata.media.length - 4} more media items
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Title */}
       <h3 className="text-xl font-semibold mb-2 text-gray-900 line-clamp-2">
         {item.title}

@@ -104,7 +104,7 @@ class MemoryCreate(BaseModel):
     url: str
     title: str
     raw_html: Optional[str] = None
-    metadata: Optional[dict] = {}
+    metadata: Optional[dict] = None
     
     @field_validator('user_id')
     @classmethod

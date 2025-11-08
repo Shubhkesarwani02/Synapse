@@ -34,7 +34,13 @@ async function loadAndInjectContext(contextData, autoSend = true) {
  */
 async function handleStoreContext(backendUrl) {
     let content = window.__SABKI_SOCH_LAST_API_PAYLOAD__ || scrapeVisibleChat();
-    if (!content) {
+    
+    // If scrapeVisibleChat returns empty or invalid, fallback to page text
+    if (!content || typeof content !== 'string' || content.trim() === '') {
+        content = document.body.innerText?.trim() || '';
+    }
+    
+    if (!content || content.trim() === '') {
         return { success: false, message: 'No content to store' };
     }
 

@@ -129,9 +129,11 @@ function scrapeVisibleChat() {
     }
 
     if (conversations.length === 0) {
-        return scrapeWithFallback();
+        const fallback = scrapeWithFallback();
+        return typeof fallback === 'string' ? fallback : '';
     }
 
-    return conversations.join('\n\n---\n\n');
+    const result = conversations.join('\n\n---\n\n');
+    return typeof result === 'string' ? result : '';
 }
 

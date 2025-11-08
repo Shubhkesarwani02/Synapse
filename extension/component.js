@@ -630,23 +630,79 @@
                       'demo_user';
         
         try {
-            const response = await fetch('http://localhost:8000/api/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: contentData.content || contentData.description || contentData.title,
-                    user_id: userId,
-                    url: contentData.url,
-                    title: contentData.title,
-                    content_type: contentData.type,
-                    metadata: JSON.stringify(contentData)
-                })
+            // Extract media URLs from the page
+            const media = [];
+            
+            // Collect images
+            document.querySelectorAll('img').forEach(img => {
+                const src = img.src || img.getAttribute('data-src');
+                if (src && src.startsWith('http') && !src.includes('pixel') && !src.includes('tracker')) {
+                    media.push({ type: 'image', url: src });
+                }
             });
             
+            // Collect videos
+            document.querySelectorAll('video').forEach(video => {
+                const src = video.src || video.querySelector('source')?.src;
+                if (src && src.startsWith('http')) {
+                    media.push({ type: 'video', url: src });
+                }
+            });
+            
+            // Collect iframes (embedded videos)
+            document.querySelectorAll('iframe').forEach(iframe => {
+                const src = iframe.src;
+                if (src && (src.includes('youtube.com') || src.includes('vimeo.com'))) {
+                    media.push({ type: 'video', url: src });
+                }
+            });
+            
+            // Build payload for /api/memory endpoint
+            const payload = {
+                user_id: userId,
+                content: contentData.content || contentData.description || contentData.title || document.body.innerText.slice(0, 5000),
+                url: contentData.url || window.location.href,
+                title: contentData.title || document.title,
+                raw_html: document.documentElement.outerHTML,
+                metadata: {
+                    ...contentData,
+                    media: media.slice(0, 20) // Limit to first 20 media items
+                }
+            };
+            
+            // Try /api/memory first, fallback to /api/save if it fails
+            let response;
+            try {
+                response = await fetch('http://localhost:8000/api/memory', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (err) {
+                console.log('Falling back to /api/save endpoint');
+                // Fallback to old endpoint
+                response = await fetch('http://localhost:8000/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: payload.content,
+                        user_id: userId,
+                        url: payload.url,
+                        title: payload.title,
+                        content_type: contentData.type,
+                        metadata: JSON.stringify(contentData)
+                    })
+                });
+            }
+            
             if (response.ok) {
+                const result = await response.json();
                 setButtonSuccess('sabkisoch-smart-save-btn', '✅ Saved!');
-                showNotification(`${contentData.type} saved to SabkiSoch! 🧠`, 'success');
+                const mediaCount = media.length > 0 ? ` (+ ${media.length} media)` : '';
+                showNotification(`${contentData.type} saved to SabkiSoch! 🧠${mediaCount}`, 'success');
             } else {
+                const errorText = await response.text();
+                console.error('Save failed:', errorText);
                 setButtonError('sabkisoch-smart-save-btn', '❌ Failed');
                 showNotification('Failed to save. Please try again.', 'error');
             }

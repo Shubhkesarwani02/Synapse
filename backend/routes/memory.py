@@ -39,15 +39,25 @@ async def save_memory(memory: MemoryCreate):
     - Books: author, isbn, cover_image
     - Articles: author, published_date, reading_time
     - Todos: task_list
+    - Media: Extracts image and video URLs from raw_html
     """
     try:
         if collection is None:
             raise HTTPException(status_code=500, detail="Collection not initialized")
         
-        # 1. Detect content type and enrich metadata
+        # 1. Extract media URLs from raw_html if provided
+        media_urls = []
+        if memory.raw_html:
+            media_urls = extract_media_urls(memory.raw_html)
+        
+        # 2. Detect content type and enrich metadata
         enriched_metadata = await enrich_metadata(memory)
         
-        # 2. Generate embedding using Gemini
+        # 3. Add media URLs to metadata
+        if media_urls:
+            enriched_metadata["media"] = media_urls
+        
+        # 4. Generate embedding using Gemini
         embedding_result = genai.embed_content(
             model=EMBEDDING_MODEL_NAME,
             content=memory.content,
@@ -55,11 +65,11 @@ async def save_memory(memory: MemoryCreate):
         )
         embedding = embedding_result['embedding']
         
-        # 3. Create memory ID and timestamp
+        # 5. Create memory ID and timestamp
         memory_id = str(uuid.uuid4())
         timestamp = datetime.now().isoformat()
         
-        # 4. Prepare metadata for ChromaDB (merge user metadata with enriched)
+        # 6. Prepare metadata for ChromaDB (merge user metadata with enriched)
         final_metadata = {
             "user_id": memory.user_id,
             "url": memory.url,
@@ -70,7 +80,7 @@ async def save_memory(memory: MemoryCreate):
             **(memory.metadata or {})  # User-provided metadata takes precedence
         }
         
-        # 5. Store in ChromaDB
+        # 7. Store in ChromaDB
         collection.add(
             ids=[memory_id],
             embeddings=[embedding],
@@ -81,13 +91,81 @@ async def save_memory(memory: MemoryCreate):
         return {
             "id": memory_id,
             "status": "success",
-            "metadata": enriched_metadata,
+            "metadata": final_metadata,
             "message": "Memory saved successfully"
         }
         
     except Exception as e:
         print(f"Error saving memory: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to save memory: {str(e)}")
+
+
+# Add /store alias for backward compatibility
+@router.post("/store")
+async def store_memory(memory: MemoryCreate):
+    """Alias for /memory endpoint for backward compatibility"""
+    return await save_memory(memory)
+
+
+def extract_media_urls(raw_html: str) -> list:
+    """
+    Extract image and video URLs from raw HTML
+    
+    Returns list of dicts: [{"type": "image|video", "url": "..."}, ...]
+    """
+    media = []
+    
+    # Extract image URLs
+    # Match <img src="..."> and <img src='...'>
+    img_pattern = r'<img[^>]+src=["\']([^"\']+)["\']'
+    img_matches = re.findall(img_pattern, raw_html, re.IGNORECASE)
+    
+    for url in img_matches:
+        # Filter out tracking pixels, icons, and very small images
+        if not any(skip in url.lower() for skip in ['pixel', 'tracker', '1x1', 'spacer', 'blank.gif']):
+            # Only add if it's a reasonable URL
+            if url.startswith('http') or url.startswith('//'):
+                media.append({"type": "image", "url": url})
+    
+    # Extract video URLs
+    # Match <video src="...">
+    video_pattern = r'<video[^>]+src=["\']([^"\']+)["\']'
+    video_matches = re.findall(video_pattern, raw_html, re.IGNORECASE)
+    
+    for url in video_matches:
+        if url.startswith('http') or url.startswith('//'):
+            media.append({"type": "video", "url": url})
+    
+    # Extract <source> tags (used in video/audio elements)
+    source_pattern = r'<source[^>]+src=["\']([^"\']+)["\']'
+    source_matches = re.findall(source_pattern, raw_html, re.IGNORECASE)
+    
+    for url in source_matches:
+        if url.startswith('http') or url.startswith('//'):
+            # Determine if it's video or image based on extension
+            if any(ext in url.lower() for ext in ['.mp4', '.webm', '.ogg', '.mov']):
+                media.append({"type": "video", "url": url})
+            elif any(ext in url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']):
+                media.append({"type": "image", "url": url})
+    
+    # Extract iframe src (often used for embedded videos)
+    iframe_pattern = r'<iframe[^>]+src=["\']([^"\']+)["\']'
+    iframe_matches = re.findall(iframe_pattern, raw_html, re.IGNORECASE)
+    
+    for url in iframe_matches:
+        # YouTube, Vimeo, etc.
+        if any(site in url.lower() for site in ['youtube.com', 'vimeo.com', 'dailymotion.com', 'twitch.tv']):
+            media.append({"type": "video", "url": url})
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_media = []
+    for item in media:
+        if item['url'] not in seen:
+            seen.add(item['url'])
+            unique_media.append(item)
+    
+    return unique_media
 
 
 async def enrich_metadata(memory: MemoryCreate) -> dict:
