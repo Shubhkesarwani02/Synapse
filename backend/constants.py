@@ -26,6 +26,52 @@ Generate a context summary:"""
 # Title generation prompt template
 TITLE_GENERATION_PROMPT = "Generate a short, descriptive title (max 50 characters) for this conversation:\n\n{text}"
 
+# Metadata enrichment prompt template
+METADATA_ENRICHMENT_PROMPT = """Analyze this web content and extract structured information:
+
+URL: {url}
+Title: {title}
+Content: {content}
+
+Determine:
+1. Content type (article, product, video, book, note, todo, quote, image, tweet, code, discussion, qa)
+2. Extract relevant metadata based on type:
+   - For products: name, price, brand, image_url
+   - For videos: video_id, platform, thumbnail
+   - For books: author, isbn, cover_image
+   - For articles: author, published_date, reading_time, platform
+   - For todos: tasks (array of objects with text and completed fields)
+   - For tweets: author, platform
+   - For code: platform, repo_owner, repo_name
+   - For discussions: platform, topic
+
+Return ONLY valid JSON with no explanation or markdown:
+{{
+    "type": "...",
+    "additional_field": "..."
+}}"""
+
+# Query analysis prompt template
+QUERY_ANALYSIS_PROMPT = """Parse this search query and extract structured search filters:
+
+Query: "{query}"
+
+Extract:
+1. semantic_query: The core semantic meaning to search for (required)
+2. content_type: Type filter if mentioned (article, product, video, book, note, todo, quote, image, tweet, code)
+3. date_filter: If time period mentioned (last week, yesterday, last month) convert to ISO date format
+4. price_max: If price limit mentioned, extract the numeric value
+5. author: If searching for content by a specific person
+
+Return ONLY valid JSON with no explanation or markdown:
+{{
+    "semantic_query": "core search meaning",
+    "content_type": null,
+    "date_filter": null,
+    "price_max": null,
+    "author": null
+}}"""
+
 # Size limits
 MAX_CONTEXT_LENGTH = 5000
 MAX_TITLE_LENGTH = 50

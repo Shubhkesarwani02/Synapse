@@ -24,7 +24,10 @@ from utils.gemini import (
 # Import Pydantic models
 from models.models import (
     StoreRequest,
-    ContextRequest
+    ContextRequest,
+    SearchRequest,
+    SearchResult,
+    MemoryCreate
 )
 
 # Import business logic modules
@@ -74,6 +77,18 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
 )
+
+# Import and initialize routers
+from routes.search import router as search_router, init_search_router
+from routes.memory import router as memory_router, init_memory_router
+
+# Initialize routers with collection
+init_search_router(collection)
+init_memory_router(collection)
+
+# Include routers
+app.include_router(search_router, prefix="/api", tags=["search"])
+app.include_router(memory_router, prefix="/api", tags=["memory"])
 
 
 @app.post("/store")
@@ -145,7 +160,9 @@ async def root():
         "endpoints": {
             "POST /store": "Store conversation data with auto-generated title",
             "GET /get_all": "Retrieve all conversations for a user",
-            "POST /search": "Search for relevant context",
+            "POST /api/search": "Semantic search for memories",
+            "POST /api/search/nl": "Natural language search with filters",
+            "POST /api/memory": "Save memory with enhanced metadata",
             "POST /generate_context": "Generate intelligent context summary from all conversations",
             "GET /generate_context/{context_id}": "Generate intelligent context summary for specific conversation",
             "DELETE /clear": "Clear all data",
