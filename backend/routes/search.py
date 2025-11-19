@@ -94,7 +94,7 @@ async def semantic_search(request: SearchRequest):
 
     except Exception as e:
         print(f"Search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}") from e
 
 
 @router.post("/search/nl", response_model=List[SearchResult])
@@ -184,7 +184,7 @@ async def natural_language_search(request: SearchRequest):
 
     except Exception as e:
         print(f"Natural language search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}") from e
 
 
 async def analyze_search_query(query: str) -> dict:
@@ -216,7 +216,7 @@ async def analyze_search_query(query: str) -> dict:
         parsed = json.loads(response_text)
         return parsed
         
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, KeyError) as e:
         print(f"Query analysis error: {str(e)}, using fallback")
         # Fallback: return the original query without filters
         return {

@@ -97,24 +97,21 @@ document.getElementById('storeBtn').addEventListener('click', async () => {
                             clearInterval(checkResult);
                             chrome.storage.local.remove(['action_response_store_context']);
 
-                            if (result.ok) {
+                            // Check both 'ok' and 'success' fields for compatibility
+                            const isSuccess = result.ok || result.success;
+                            
+                            if (isSuccess) {
                                 setButtonSuccess(storeBtn, '✅ Stored!');
-                                status.textContent = result.message || 'Conversation stored successfully!';
+                                status.textContent = result.message || 'Content stored successfully!';
                                 status.className = 'status success';
                                 status.style.display = 'block';
                                 closePopup(2000);
                             } else {
                                 setButtonError(storeBtn, '❌ Failed');
-                                status.textContent = result.error || result.message || 'Failed to store conversation.';
+                                status.textContent = result.error || result.message || 'Failed to store content.';
                                 status.className = 'status error';
                                 status.style.display = 'block';
                             }
-
-                            setTimeout(() => {
-                                storeBtn.querySelector('span').textContent = originalText;
-                                storeBtn.disabled = false;
-                                status.style.display = 'none';
-                            }, 2000);
                         }
                     }, 200); // Check every 200ms
 

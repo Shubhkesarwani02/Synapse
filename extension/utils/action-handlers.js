@@ -33,6 +33,36 @@ async function loadAndInjectContext(contextData, autoSend = true) {
  * Handle store context action
  */
 async function handleStoreContext(backendUrl) {
+    // Try smart save first (detects YouTube videos, products, etc.)
+    const userId = await getOrCreateUserId();
+    console.log('📤 store-context using user_id:', userId);
+    
+    // Attempt smart save
+    try {
+        const smartResult = await smartSave(backendUrl, userId);
+        
+        if (smartResult.success) {
+            // Success! Format message based on result
+            let message = smartResult.message;
+            
+            if (smartResult.saved_count !== undefined) {
+                // Bulk save result
+                message = `Saved ${smartResult.saved_count} items!`;
+                if (smartResult.failed_count > 0) {
+                    message += ` (${smartResult.failed_count} failed)`;
+                }
+            }
+            
+            return {
+                success: true,
+                message: message
+            };
+        }
+    } catch (error) {
+        console.warn('Smart save failed, falling back to text extraction:', error);
+    }
+    
+    // Fallback to old method - scrape visible content
     let content = window.__SABKI_SOCH_LAST_API_PAYLOAD__ || scrapeVisibleChat();
 
     // Ensure content is a string
@@ -59,10 +89,6 @@ async function handleStoreContext(backendUrl) {
         return { success: false, message: 'No content to store' };
     }
 
-    // MVP: Use hardcoded user ID
-    const userId = "mvp_demo_user_2024";
-    console.log('📤 store-context using user_id:', userId);
-
     const payload = {
         user_id: userId,
         source: location.hostname,
@@ -72,8 +98,9 @@ async function handleStoreContext(backendUrl) {
 
     const result = await storeToBackend(payload, backendUrl);
     return {
-        success: result.ok,
-        message: result.ok ? 'Chat stored successfully!' : 'Failed to store chat'
+        success: result.ok || result.status === 'success',
+        message: (result.ok || result.status === 'success') ? 'Content stored successfully!' : 'Failed to store content',
+        error: result.error || result.detail
     };
 }
 

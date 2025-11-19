@@ -17,6 +17,10 @@
             "js":[
                 "utils/constants.js",
                 "utils/scraping.js",
+                "utils/youtube-detector.js",
+                "utils/product-detector.js",
+                "utils/content-detector.js",
+                "utils/smart-save.js",
                 "utils/dom-utils.js",
                 "utils/storage.js",
                 "utils/api.js",

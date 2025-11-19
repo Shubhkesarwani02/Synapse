@@ -16,7 +16,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <div className="min-h-screen bg-[var(--bg-soft)] text-[var(--text)] antialiased">
+          <main className="app-container py-10">{children}</main>
+        </div>
+      </body>
     </html>
   )
 }

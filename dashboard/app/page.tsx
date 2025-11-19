@@ -227,43 +227,47 @@ export default function Dashboard() {
   const isSearchMode = !!query.trim();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-6xl font-bold text-gray-900 mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-600">
-            Recallhub
-          </h1>
-          <p className="text-xl text-gray-600">Your Second Brain - Search Your Memories Naturally</p>
-          <div className="flex items-center justify-center gap-4 mt-2">
-            <p className="text-sm text-gray-500">User: {userId}</p>
-            <button
-              onClick={fetchAllMemories}
-              disabled={loadingMemories}
-              className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Refresh memories"
-            >
-              {loadingMemories ? '🔄 Loading...' : '🔄 Refresh'}
-            </button>
+        <div className="mb-8">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <div>
+              <h1 className="text-3xl font-semibold text-[var(--text)] leading-tight">Recallhub</h1>
+              <p className="text-sm muted mt-1">Your Second Brain — search your memories naturally</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <p className="text-sm muted">User: <span className="font-mono text-xs muted">{userId || '—'}</span></p>
+              <button
+                onClick={fetchAllMemories}
+                disabled={loadingMemories}
+                className="btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh memories"
+              >
+                {loadingMemories ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
           </div>
+          <div className="max-w-4xl mx-auto mt-6 border-t" style={{borderTopColor: 'var(--border)'}} />
         </div>
 
         {/* Stats */}
         {stats && stats.total > 0 && (
-          <div className="max-w-4xl mx-auto mb-6 p-4 bg-white rounded-lg shadow-sm">
-            <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+          <div className="max-w-4xl mx-auto mb-6 p-4 card">
+            <div className="flex flex-wrap items-center justify-center gap-6 text-sm">
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{stats.total}</div>
-                <div className="text-gray-600">Total Memories</div>
+                <div className="text-2xl font-bold text-[var(--text)]">{stats.total}</div>
+                <div className="muted">Total Memories</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{stats.recent_count}</div>
-                <div className="text-gray-600">Recent (7 days)</div>
+                <div className="text-2xl font-bold text-[var(--text)]">{stats.recent_count}</div>
+                <div className="muted">Recent (7 days)</div>
               </div>
               {Object.entries(stats.by_type).map(([type, count]) => (
                 <div key={type} className="text-center">
-                  <div className="text-xl font-semibold text-gray-700">{count}</div>
-                  <div className="text-gray-600 capitalize">{type}</div>
+                  <div className="text-xl font-semibold text-[var(--text)]">{count}</div>
+                  <div className="muted capitalize">{type}</div>
                 </div>
               ))}
             </div>
@@ -287,9 +291,7 @@ export default function Dashboard() {
               <button
                 onClick={() => setSelectedType('all')}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  selectedType === 'all'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                  selectedType === 'all' ? 'btn-primary' : 'btn-outline'
                 }`}
               >
                 All ({allMemories.length})
@@ -299,9 +301,7 @@ export default function Dashboard() {
                   key={type}
                   onClick={() => setSelectedType(type)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
-                    selectedType === type
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                    selectedType === type ? 'btn-primary' : 'btn-outline'
                   }`}
                 >
                   {type} ({stats?.by_type[type] || 0})
@@ -320,7 +320,7 @@ export default function Dashboard() {
 
         {/* Results Count */}
         {displayMemories.length > 0 && (
-          <div className="max-w-4xl mx-auto mb-6 text-center text-gray-600">
+          <div className="max-w-4xl mx-auto mb-6 text-center muted">
             {isSearchMode 
               ? `Found ${results.length} memories` 
               : `Showing ${displayMemories.length} ${selectedType === 'all' ? 'memories' : selectedType + 's'}`
@@ -330,7 +330,7 @@ export default function Dashboard() {
 
         {/* Loading State */}
         {(loading || loadingMemories) && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 muted">
             <p className="text-lg">Loading...</p>
           </div>
         )}

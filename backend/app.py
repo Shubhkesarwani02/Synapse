@@ -1,15 +1,16 @@
 # backend/app.py
 import os
+import json
+import uuid
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import chromadb
-from chromadb.config import Settings
 import google.generativeai as genai
 from dotenv import load_dotenv
 from chromadb.errors import NotFoundError
-import json
 
 # Import constants
 from constants import (
@@ -29,17 +30,13 @@ from utils.gemini import (
 from models.models import (
     StoreRequest,
     ContextRequest,
-    SearchRequest,
-    SearchResult,
     MemoryCreate
 )
 
 # Import business logic modules
 from src.context import (
-    store_conversation,
     get_all_conversations,
     clear_all_data as clear_all_data_func,
-    clear_user_data as clear_user_data_func,
     delete_context_by_id as delete_context_by_id_func
 )
 from src.generate_context import (
@@ -86,10 +83,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         body_str = body.decode('utf-8')
         try:
             body_json = json.loads(body_str)
-        except:
+        except json.JSONDecodeError:
             body_json = body_str
-    except:
-        body_json = "Could not read body"
+    except Exception as e:
+        body_json = f"Could not read body: {str(e)}"
     
     # Log the error details
     print("=" * 80)
@@ -159,9 +156,6 @@ async def save_content(req: StoreRequest):
         embedding = embedding_result['embedding']
         
         # Create unique ID and timestamp
-        import uuid
-        from datetime import datetime
-        
         memory_id = str(uuid.uuid4())
         timestamp = datetime.now().isoformat()
         
@@ -169,9 +163,8 @@ async def save_content(req: StoreRequest):
         metadata_dict = {}
         if req.metadata:
             try:
-                import json
                 metadata_dict = json.loads(req.metadata) if isinstance(req.metadata, str) else req.metadata
-            except:
+            except (json.JSONDecodeError, TypeError):
                 pass
         
         # Prepare metadata for ChromaDB
@@ -203,13 +196,13 @@ async def save_content(req: StoreRequest):
         
     except Exception as e:
         print(f"Error saving content: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save content: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save content: {str(e)}") from e
 
 @app.get("/api/stats")
-async def get_stats(user_id: str = None):  # MVP: Parameter ignored, uses constant
+async def get_stats():
     """Get statistics for a user's saved content"""
     try:
-        # MVP: Use constant USER_ID instead of parameter
+        # MVP: Use constant USER_ID
         # Get all items for user
         results = collection.get(
             where={"user_id": USER_ID}  # MVP: Always use constant
@@ -243,16 +236,13 @@ async def get_stats(user_id: str = None):  # MVP: Parameter ignored, uses consta
         
     except Exception as e:
         print(f"Error getting stats: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}") from e
 
 @app.delete("/api/delete/{memory_id}")
-async def delete_memory(
-    memory_id: str,
-    user_id: str = Query(None, description="User ID (ignored in MVP)")
-):
+async def delete_memory(memory_id: str):
     """Delete a specific memory by ID"""
     try:
-        # MVP: Use constant USER_ID instead of parameter
+        # MVP: Use constant USER_ID
         # Verify ownership
         result = collection.get(
             ids=[memory_id],
@@ -275,11 +265,11 @@ async def delete_memory(
         raise
     except Exception as e:
         print(f"Error deleting memory: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete memory: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete memory: {str(e)}") from e
 
 @app.get("/get_all")
-async def get_all(user_id: str = None):  # MVP: Parameter ignored, uses constant
-    # MVP: Use constant USER_ID instead of parameter
+async def get_all():
+    # MVP: Use constant USER_ID
     return await get_all_conversations(USER_ID, collection)
 
 
@@ -297,26 +287,23 @@ async def health_check():
             "api_version": API_VERSION
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}") from e
 
 @app.delete("/clear")
 async def clear_all_data():
     """Clear all data from ChromaDB collection"""
     return await clear_all_data_func(collection)
 
-@app.delete("/clear/{user_id}")
-async def clear_user_data(user_id: str = None):  # MVP: Parameter ignored
+@app.delete("/clear/user")
+async def clear_user_data():
     """Clear all data for a specific user (MVP: clears all data)"""
-    # MVP: Use constant USER_ID - but actually clear all for MVP
-    return await clear_all_data_func(collection)  # MVP: Clear all data
+    # MVP: Clear all data
+    return await clear_all_data_func(collection)
 
 @app.delete("/delete_context/{context_id}")
-async def delete_context(
-    context_id: str,
-    user_id: str = Query(None, description="User ID (ignored in MVP)")
-):
+async def delete_context(context_id: str):
     """Delete a specific context by context_id (MVP: uses constant USER_ID)"""
-    # MVP: Use constant USER_ID instead of parameter
+    # MVP: Use constant USER_ID
     return await delete_context_by_id_func(context_id, USER_ID, collection)
 
 
@@ -327,12 +314,11 @@ async def generate_context(request: ContextRequest):
 
 @app.get("/generate_context/{context_id}")
 async def generate_context_by_id(
-    context_id: str, 
-    user_id: str = Query(None, description="User ID (ignored in MVP)"), 
+    context_id: str,
     max_length: int = Query(2000, description="Maximum context length")
 ):
     """Generate intelligent context summary for a specific stored conversation (MVP: uses constant USER_ID)"""
-    # MVP: Use constant USER_ID instead of parameter
+    # MVP: Use constant USER_ID
     return await generate_context_from_specific_conversation(context_id, USER_ID, max_length, collection)
 
 @app.get("/")
@@ -362,7 +348,6 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    import os
     
     # Get port from environment (Railway sets this)
     port = int(os.environ.get("PORT", 8000))

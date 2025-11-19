@@ -1,19 +1,18 @@
 // content-detector.js
 // Detects content type and extracts metadata from any webpage
 
-export const detectContentType = () => {
+const detectContentType = () => {
   const url = window.location.href;
   const domain = window.location.hostname;
   
-  // Product detection (Amazon, eBay, etc.)
-  if (domain.includes('amazon.') || domain.includes('ebay.') || 
-      domain.includes('shopify.') || domain.includes('etsy.')) {
-    return { type: 'product', extractor: extractProduct };
+  // YouTube detection - handle all videos on page
+  if (isYouTubePage()) {
+    return { type: 'video', extractor: extractAllYouTubeVideos, isBulk: true };
   }
   
-  // Video detection (YouTube, Vimeo)
-  if (domain.includes('youtube.com') || domain.includes('vimeo.com')) {
-    return { type: 'video', extractor: extractVideo };
+  // E-commerce detection - handle all products on page
+  if (isEcommerceSite()) {
+    return { type: 'product', extractor: extractAllProducts, isBulk: true };
   }
   
   // Article detection (Medium, Substack, blogs)
@@ -23,6 +22,18 @@ export const detectContentType = () => {
   
   // Default to note
   return { type: 'note', extractor: extractGeneric };
+};
+
+// Wrapper for YouTube detection
+const extractAllYouTubeVideos = () => {
+  const videos = detectAllYouTubeVideos();
+  return { items: videos, formatted: formatVideosForStorage(videos) };
+};
+
+// Wrapper for product detection
+const extractAllProducts = () => {
+  const products = detectAllProducts();
+  return { items: products, formatted: formatProductsForStorage(products) };
 };
 
 const isArticlePage = () => {

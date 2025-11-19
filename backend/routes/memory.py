@@ -65,19 +65,22 @@ async def save_memory(memory: MemoryCreate):
             elif memory.url:
                 try:
                     memory.title = memory.url.split('/')[-1] or "Untitled"
-                except:
+                except (ValueError, IndexError):
                     memory.title = "Untitled"
             else:
                 memory.title = "Untitled"
         
-        # 4. Add media URLs to metadata (serialize as JSON string for ChromaDB)
+        # Add media URLs to metadata (serialize as JSON string for ChromaDB)
         if media_urls:
             enriched_metadata["media"] = json.dumps(media_urls)
         
         # 5. Generate embedding using Gemini
+        # Create rich embedding text that includes title and key metadata for better semantic search
+        embedding_text = create_embedding_text(memory, enriched_metadata)
+        
         embedding_result = genai.embed_content(
             model=EMBEDDING_MODEL_NAME,
-            content=memory.content,
+            content=embedding_text,
             task_type="retrieval_document"
         )
         embedding = embedding_result['embedding']
@@ -145,7 +148,7 @@ async def save_memory(memory: MemoryCreate):
         
     except Exception as e:
         print(f"Error saving memory: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save memory: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save memory: {str(e)}") from e
 
 
 # Add /store alias for backward compatibility
@@ -248,10 +251,57 @@ async def enrich_metadata(memory: MemoryCreate) -> dict:
         metadata = json.loads(response_text)
         return metadata
         
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, KeyError) as e:
         print(f"AI metadata enrichment failed: {str(e)}, using fallback")
         # Fallback to basic rule-based detection
         return detect_content_type_basic(memory.url, memory.content, memory.title)
+
+
+def create_embedding_text(memory: MemoryCreate, enriched_metadata: dict) -> str:
+    """
+    Create rich text for embedding that includes title and key metadata
+    This improves semantic search by providing more context
+    """
+    parts = []
+    
+    # Add title (most important)
+    if memory.title:
+        parts.append(f"Title: {memory.title}")
+    
+    # Add content type
+    if enriched_metadata.get('type'):
+        parts.append(f"Type: {enriched_metadata['type']}")
+    
+    # Add type-specific metadata
+    content_type = enriched_metadata.get('type', 'note')
+    
+    if content_type == 'video':
+        if enriched_metadata.get('channel'):
+            parts.append(f"Channel: {enriched_metadata['channel']}")
+        if enriched_metadata.get('platform'):
+            parts.append(f"Platform: {enriched_metadata['platform']}")
+    
+    elif content_type == 'product':
+        if enriched_metadata.get('brand'):
+            parts.append(f"Brand: {enriched_metadata['brand']}")
+        if enriched_metadata.get('price'):
+            parts.append(f"Price: ${enriched_metadata['price']}")
+    
+    elif content_type == 'article':
+        if enriched_metadata.get('author'):
+            parts.append(f"Author: {enriched_metadata['author']}")
+        if enriched_metadata.get('platform'):
+            parts.append(f"Platform: {enriched_metadata['platform']}")
+    
+    elif content_type == 'code':
+        if enriched_metadata.get('repo_owner') and enriched_metadata.get('repo_name'):
+            parts.append(f"Repository: {enriched_metadata['repo_owner']}/{enriched_metadata['repo_name']}")
+    
+    # Add main content
+    parts.append(f"Content: {memory.content}")
+    
+    # Join all parts
+    return "\n".join(parts)
 
 
 def detect_content_type_basic(url: str, content: str, title: str) -> dict:
@@ -273,14 +323,14 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
                 video_id = url.split("v=")[1].split("&")[0]
                 metadata["video_id"] = video_id
                 metadata["thumbnail"] = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-            except:
+            except (ValueError, IndexError):
                 pass
         elif url and "youtu.be/" in url:
             try:
                 video_id = url.split("youtu.be/")[1].split("?")[0]
                 metadata["video_id"] = video_id
                 metadata["thumbnail"] = f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-            except:
+            except (ValueError, IndexError):
                 pass
     
     # Vimeo videos
@@ -344,7 +394,7 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
                     if len(repo_path) >= 2:
                         metadata["repo_owner"] = repo_path[0]
                         metadata["repo_name"] = repo_path[1]
-            except:
+            except (ValueError, IndexError):
                 pass
     
     # Medium, Dev.to, Substack (Articles)
@@ -353,7 +403,7 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
         if url:
             try:
                 metadata["platform"] = url.split("//")[1].split("/")[0]
-            except:
+            except (ValueError, IndexError):
                 metadata["platform"] = "unknown"
     
     # Wikipedia
@@ -376,7 +426,7 @@ def detect_content_type_basic(url: str, content: str, title: str) -> dict:
         metadata["type"] = "image"
         metadata["image_url"] = url
     
-    # Todo detection - check content for task indicators
+    # NOTE: Task detection - check content for task indicators
     elif any(indicator in content_lower for indicator in ['[ ]', '[x]', 'todo', 'task']):
         metadata["type"] = "todo"
         

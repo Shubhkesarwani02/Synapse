@@ -447,3 +447,6 @@ extension.zip
 build/
 dist/
 out/
+/ARCHITECTURE.md
+/FILE_STRUCTURE.md
+/WORKFLOW.md

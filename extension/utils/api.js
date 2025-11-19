@@ -12,14 +12,25 @@ async function storeToBackend(payload, backendUrl) {
         })
 
         if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.detail || `HTTP ${res.status}: ${res.statusText}`);
         }
 
         const result = await res.json();
-        return result;
+        // Normalize response format
+        return {
+            ok: true,
+            status: result.status || 'success',
+            ...result
+        };
     } catch (err) {
         console.error('❌ Error storing to backend:', err);
-        return { ok: false, error: String(err) };
+        return {
+            ok: false,
+            status: 'error',
+            error: String(err),
+            detail: err.message
+        };
     }
 }
 

@@ -12,29 +12,29 @@ interface MemoryCardProps {
 
 export default function MemoryCard({ item }: MemoryCardProps) {
   const cardStyles: Record<string, string> = {
-    article: 'border-l-4 border-blue-500',
-    product: 'border-l-4 border-green-500',
-    video: 'border-l-4 border-red-500',
-    book: 'border-l-4 border-yellow-500',
-    note: 'border-l-4 border-purple-500',
-    todo: 'border-l-4 border-orange-500',
-    tweet: 'border-l-4 border-sky-400',
-    code: 'border-l-4 border-gray-700',
-    quote: 'border-l-4 border-pink-500',
+    article: 'border-l-4 border-[var(--border)]',
+    product: 'border-l-4 border-[var(--border)]',
+    video: 'border-l-4 border-[var(--border)]',
+    book: 'border-l-4 border-[var(--border)]',
+    note: 'border-l-4 border-[var(--border)]',
+    todo: 'border-l-4 border-[var(--border)]',
+    tweet: 'border-l-4 border-[var(--border)]',
+    code: 'border-l-4 border-[var(--border)]',
+    quote: 'border-l-4 border-[var(--border)]',
   };
 
   const contentType = item.metadata?.type || 'article';
-  const typeEmojis: Record<string, string> = {
-    article: '📄',
-    product: '🛍️',
-    video: '🎥',
-    book: '📚',
-    note: '📝',
-    todo: '✓',
-    tweet: '🐦',
-    code: '💻',
-    quote: '💬',
-    image: '🖼️',
+  const typeSVGs: Record<string, string> = {
+    article: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M7 8H17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 12H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    product: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 3l-2 4H10L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    video: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M22 7l-6 4v2l6 4V7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    book: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 4.5A2.5 2.5 0 016.5 7H20v11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    note: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M8 7h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 11h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    todo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    tweet: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23 3a10.9 10.9 0 01-3.14 1.53A4.48 4.48 0 0012 7v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    code: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 18l6-6-6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    quote: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 10h-6v7h6v-7zM9 10H3v7h6v-7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>',
+    image: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 15l6-6 4 4 6-6v10H3z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>'
   };
 
   const formatDate = (dateString: string) => {
@@ -50,7 +50,7 @@ export default function MemoryCard({ item }: MemoryCardProps) {
   };
 
   return (
-    <div className={`bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 ${cardStyles[contentType] || ''}`}>
+    <div className={`card p-6 transition-all duration-200 transform hover:-translate-y-1 ${cardStyles[contentType] || ''}`}>
       {/* Video Embed */}
       {contentType === 'video' && item.metadata.video_id && (
         <div className="mb-4 rounded-lg overflow-hidden">
@@ -80,7 +80,7 @@ export default function MemoryCard({ item }: MemoryCardProps) {
         <img
           src={item.metadata.cover_image}
           alt={item.title}
-          className="w-full h-64 object-contain rounded-lg mb-4 bg-gray-50"
+          className="w-full h-64 object-contain rounded-lg mb-4 bg-[var(--bg-soft)]"
         />
       )}
 
@@ -106,7 +106,7 @@ export default function MemoryCard({ item }: MemoryCardProps) {
               {media.slice(0, 4).map((mediaItem: any, idx: number) => (
               <div key={idx} className="relative rounded-lg overflow-hidden">
                 {mediaItem.type === 'image' ? (
-                  <img
+                    <img
                     src={mediaItem.url}
                     alt={`Media ${idx + 1}`}
                     className="w-full h-32 object-cover hover:scale-110 transition-transform duration-300"
@@ -141,33 +141,31 @@ export default function MemoryCard({ item }: MemoryCardProps) {
       })()}
 
       {/* Title */}
-      <h3 className="text-xl font-semibold mb-2 text-gray-900 line-clamp-2">
+      <h3 className="text-lg font-semibold mb-2 text-[var(--text)] line-clamp-2">
         {item.title}
       </h3>
 
       {/* Price (for products) */}
       {contentType === 'product' && item.metadata.price && (
-        <p className="text-2xl font-bold text-green-600 mb-2">
+        <p className="text-2xl font-bold text-[var(--text)] mb-2">
           {item.metadata.price}
         </p>
       )}
 
       {/* Author (for books/articles) */}
       {item.metadata.author && (
-        <p className="text-sm text-gray-600 mb-2">
-          by {item.metadata.author}
-        </p>
+        <p className="text-sm muted mb-2">by {item.metadata.author}</p>
       )}
 
       {/* Platform Badge */}
       {item.metadata.platform && (
-        <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full mb-2">
+        <span className="inline-block px-2 py-1 text-xs bg-[var(--bg-soft)] text-[var(--text)] rounded-full mb-2">
           {item.metadata.platform}
         </span>
       )}
 
       {/* Content Preview */}
-      <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+      <p className="muted-2 text-sm mb-4 line-clamp-3">
         {item.content}
       </p>
 
@@ -207,26 +205,21 @@ export default function MemoryCard({ item }: MemoryCardProps) {
       })()}
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-sm text-gray-500 pt-4 border-t border-gray-100">
-        <span className="px-3 py-1 bg-gray-100 rounded-full flex items-center gap-1">
-          <span>{typeEmojis[contentType] || '📄'}</span>
-          <span className="capitalize">{contentType}</span>
+      <div className="flex items-center justify-between text-sm muted-2 pt-4 border-t" style={{borderTopColor: 'var(--border)'}}>
+        <span className="px-3 py-1 bg-[var(--bg-soft)] rounded-full flex items-center gap-2 text-[var(--text)]">
+            <span className="text-sm" dangerouslySetInnerHTML={{ __html: typeSVGs[contentType] || typeSVGs.article }} />
+          <span className="capitalize text-sm">{contentType}</span>
         </span>
-        <span>{formatDate(item.timestamp)}</span>
+        <span className="text-sm muted">{formatDate(item.timestamp)}</span>
       </div>
 
       {/* Similarity Score - Only show for search results */}
       {item.similarity_score !== undefined && (
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex-1 bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full"
-              style={{ width: `${item.similarity_score * 100}%` }}
-            />
+        <div className="mt-2">
+          <div className="w-full bg-[var(--border)] rounded-full h-2">
+            <div style={{ width: `${item.similarity_score * 100}%`, height: '8px', background: 'var(--accent)', borderRadius: 8 }} />
           </div>
-          <span className="text-xs text-gray-500">
-            {(item.similarity_score * 100).toFixed(0)}%
-          </span>
+          <div className="text-xs muted mt-1">{(item.similarity_score * 100).toFixed(0)}%</div>
         </div>
       )}
 
@@ -235,7 +228,7 @@ export default function MemoryCard({ item }: MemoryCardProps) {
         href={item.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-4 block text-center px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-colors font-medium"
+        className="mt-4 inline-block btn-outline text-center w-full text-sm font-medium"
       >
         View Original →
       </a>

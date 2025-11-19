@@ -140,7 +140,7 @@ class MemoryCreate(BaseModel):
             print(f"Warning: Text truncated to {MAX_TEXT_LENGTH} characters")
         return v
     
-    def model_post_init(self, __context):
+    def model_post_init(self, __context):  # type: ignore
         """Ensure we have content from either 'content' or 'text' field"""
         if not self.content and self.text:
             self.content = self.text
